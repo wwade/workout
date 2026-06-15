@@ -4,10 +4,12 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performImeAction
 import com.example.workout.domain.model.LoadUnit
 import com.example.workout.ui.screen.ActiveSessionScreen
@@ -66,7 +68,43 @@ class ActiveSessionScreenTest {
         composeRule.onNodeWithTag("load-1").assertTextContains("30")
     }
 
-    private fun activeSessionState(currentSetIndex: Int): ActiveSessionState {
+    @Test
+    fun newRoundScrollsBackToTop() {
+        var state by mutableStateOf(activeSessionState(currentSetIndex = 0, exerciseCount = 12))
+
+        composeRule.setContent {
+            ActiveSessionScreen(
+                state = state,
+                onBack = {},
+                onUpdateReps = { exerciseId, value ->
+                    state = state.updateExercise(exerciseId) { copy(repsInput = value) }
+                },
+                onUpdateLoad = { exerciseId, value ->
+                    state = state.updateExercise(exerciseId) { copy(loadInput = value) }
+                },
+                onUpdateNotes = { exerciseId, value ->
+                    state = state.updateExercise(exerciseId) { copy(notesInput = value) }
+                },
+                onUpdateSkipped = { exerciseId, value ->
+                    state = state.updateExercise(exerciseId) { copy(skipped = value) }
+                },
+                onSaveRound = {},
+                onAbandonSession = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("exercise-list").performScrollToIndex(11)
+        composeRule.onNodeWithTag("reps-12").assertIsDisplayed()
+
+        composeRule.runOnUiThread {
+            state = activeSessionState(currentSetIndex = 1, exerciseCount = 12)
+        }
+
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("reps-1").assertIsDisplayed().assertIsFocused()
+    }
+
+    private fun activeSessionState(currentSetIndex: Int, exerciseCount: Int = 2): ActiveSessionState {
         return ActiveSessionState(
             sessionId = 1,
             workoutName = "Part one",
@@ -74,20 +112,14 @@ class ActiveSessionScreenTest {
             currentCircuitName = "Warmup",
             currentSetIndex = currentSetIndex,
             totalSetsInCircuit = 3,
-            exerciseCards = listOf(
+            exerciseCards = (1..exerciseCount).map { index ->
                 exerciseCard(
-                    exerciseSessionId = 1,
-                    exerciseName = "First",
-                    repsInput = "8",
-                    loadInput = "30",
-                ),
-                exerciseCard(
-                    exerciseSessionId = 2,
-                    exerciseName = "Second",
-                    repsInput = "10",
-                    loadInput = "40",
-                ),
-            ),
+                    exerciseSessionId = index.toLong(),
+                    exerciseName = "Exercise $index",
+                    repsInput = if (index == 1) "8" else "10",
+                    loadInput = if (index == 1) "30" else "40",
+                )
+            },
         )
     }
 

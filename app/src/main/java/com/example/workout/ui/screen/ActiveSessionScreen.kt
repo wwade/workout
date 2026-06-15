@@ -63,6 +63,12 @@ fun ActiveSessionScreen(
     val repsFocusRequesters = remember(exerciseIds) { exerciseIds.map { FocusRequester() } }
     val loadFocusRequesters = remember(exerciseIds) { exerciseIds.map { FocusRequester() } }
 
+    LaunchedEffect(state.currentCircuitIndex, state.currentSetIndex, state.isCompleted) {
+        if (!state.isCompleted) {
+            listState.scrollToItem(0)
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -95,6 +101,7 @@ fun ActiveSessionScreen(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
+                .testTag("exercise-list")
                 .padding(padding)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),

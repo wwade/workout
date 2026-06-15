@@ -128,10 +128,10 @@ class ActiveSessionViewModel(
     }
 
     private data class EditableEntry(
-        val reps: String = "",
-        val load: String = "",
-        val notes: String = "",
-        val skipped: Boolean = false,
+        val reps: String? = null,
+        val load: String? = null,
+        val notes: String? = null,
+        val skipped: Boolean? = null,
     )
 
     private data class TransientUiState(
