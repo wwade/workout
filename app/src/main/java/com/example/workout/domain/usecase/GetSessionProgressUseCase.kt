@@ -83,10 +83,10 @@ object SessionProgressCalculator {
                 loadRangeLabel = buildLoadRangeLabel(exercise.loadMin, exercise.loadMax, exercise.loadUnit.name.lowercase()),
                 loadUnit = exercise.loadUnit,
                 restTimeSeconds = exercise.restTimeSeconds,
-                suggestedReps = prefill?.repsActual,
+                suggestedReps = previousSet?.repsActual ?: prefill?.repsActual,
                 suggestedLoad = previousSet?.loadActual ?: prefill?.loadActual,
                 suggestedNotes = prefill?.notes.orEmpty(),
-                suggestedSkipped = prefill?.skipped ?: false,
+                suggestedSkipped = false,
             )
         }
         return SessionProgressSnapshot(

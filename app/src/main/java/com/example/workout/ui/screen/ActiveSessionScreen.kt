@@ -8,8 +8,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -21,17 +23,26 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.text.KeyboardOptions
 import com.example.workout.ui.state.ActiveSessionState
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,13 +57,11 @@ fun ActiveSessionScreen(
     onAbandonSession: () -> Unit,
 ) {
     val focusManager = LocalFocusManager.current
-    val firstRepsFocusRequester = remember { FocusRequester() }
-
-    LaunchedEffect(state.currentCircuitIndex, state.currentSetIndex) {
-        if (state.exerciseCards.isNotEmpty() && !state.isCompleted) {
-            firstRepsFocusRequester.requestFocus()
-        }
-    }
+    val coroutineScope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
+    val exerciseIds = state.exerciseCards.map { it.exerciseSessionId }
+    val repsFocusRequesters = remember(exerciseIds) { exerciseIds.map { FocusRequester() } }
+    val loadFocusRequesters = remember(exerciseIds) { exerciseIds.map { FocusRequester() } }
 
     Scaffold(
         topBar = {
@@ -83,6 +92,7 @@ fun ActiveSessionScreen(
         },
     ) { padding ->
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
@@ -98,8 +108,15 @@ fun ActiveSessionScreen(
                 }
             }
 
-            items(state.exerciseCards, key = { it.exerciseSessionId }) { exercise ->
-                val isFirstExercise = exercise.exerciseSessionId == state.exerciseCards.firstOrNull()?.exerciseSessionId
+            itemsIndexed(state.exerciseCards, key = { _, exercise -> exercise.exerciseSessionId }) { index, exercise ->
+                if (index == 0) {
+                    LaunchedEffect(state.currentCircuitIndex, state.currentSetIndex, exercise.exerciseSessionId) {
+                        if (!state.isCompleted) {
+                            withFrameNanos { }
+                            repsFocusRequesters[index].requestFocus()
+                        }
+                    }
+                }
                 Card {
                     Column(
                         modifier = Modifier.padding(16.dp),
@@ -123,58 +140,108 @@ fun ActiveSessionScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            OutlinedTextField(
+                            SelectAllTextField(
                                 value = exercise.repsInput,
                                 onValueChange = { onUpdateReps(exercise.exerciseSessionId, it) },
                                 label = { Text("Reps") },
-                                placeholder = {
-                                    if (exercise.suggestedRepsText.isNotEmpty()) {
-                                        Text(exercise.suggestedRepsText)
-                                    }
-                                },
+                                resetKey = "${state.currentCircuitIndex}:${state.currentSetIndex}:${exercise.exerciseSessionId}:reps",
                                 modifier = Modifier
                                     .weight(1f)
-                                    .then(
-                                        if (isFirstExercise) {
-                                            Modifier.focusRequester(firstRepsFocusRequester)
-                                        } else {
-                                            Modifier
-                                        },
-                                    ),
+                                    .focusRequester(repsFocusRequesters[index])
+                                    .testTag("reps-${exercise.exerciseSessionId}"),
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.Number,
                                     imeAction = ImeAction.Next,
                                 ),
                                 keyboardActions = KeyboardActions(
-                                    onNext = { focusManager.moveFocus(FocusDirection.Next) },
+                                    onNext = {
+                                        runCatching { loadFocusRequesters[index].requestFocus() }
+                                            .getOrElse { focusManager.moveFocus(FocusDirection.Next) }
+                                    },
                                 ),
-                                singleLine = true,
                                 enabled = !exercise.skipped,
                             )
-                            OutlinedTextField(
+                            SelectAllTextField(
                                 value = exercise.loadInput,
                                 onValueChange = { onUpdateLoad(exercise.exerciseSessionId, it) },
                                 label = { Text("Load (${exercise.loadUnit.name.lowercase()})") },
-                                placeholder = {
-                                    if (exercise.suggestedLoadText.isNotEmpty()) {
-                                        Text(exercise.suggestedLoadText)
-                                    }
-                                },
-                                modifier = Modifier.weight(1f),
+                                resetKey = "${state.currentCircuitIndex}:${state.currentSetIndex}:${exercise.exerciseSessionId}:load",
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .focusRequester(loadFocusRequesters[index])
+                                    .testTag("load-${exercise.exerciseSessionId}"),
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.Decimal,
                                     imeAction = ImeAction.Next,
                                 ),
                                 keyboardActions = KeyboardActions(
-                                    onNext = { focusManager.moveFocus(FocusDirection.Next) },
+                                    onNext = {
+                                        val nextIndex = index + 1
+                                        if (nextIndex < state.exerciseCards.size) {
+                                            coroutineScope.launch {
+                                                listState.animateScrollToItem(nextIndex)
+                                                withFrameNanos { }
+                                                runCatching { repsFocusRequesters[nextIndex].requestFocus() }
+                                                    .getOrElse { focusManager.clearFocus() }
+                                            }
+                                        } else {
+                                            focusManager.clearFocus()
+                                        }
+                                    },
                                 ),
-                                singleLine = true,
                                 enabled = !exercise.skipped,
                             )
                         }
+                        OutlinedTextField(
+                            value = exercise.notesInput,
+                            onValueChange = { onUpdateNotes(exercise.exerciseSessionId, it) },
+                            label = { Text("Notes") },
+                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
+                        )
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun SelectAllTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: @Composable () -> Unit,
+    resetKey: Any,
+    modifier: Modifier = Modifier,
+    keyboardOptions: KeyboardOptions,
+    keyboardActions: KeyboardActions,
+    enabled: Boolean,
+) {
+    var fieldValue by remember(resetKey) { mutableStateOf(TextFieldValue(value)) }
+    var wasFocused by remember(resetKey) { mutableStateOf(false) }
+
+    LaunchedEffect(value, resetKey) {
+        if (value != fieldValue.text) {
+            fieldValue = TextFieldValue(value, TextRange(value.length))
+        }
+    }
+
+    OutlinedTextField(
+        value = fieldValue,
+        onValueChange = {
+            fieldValue = it
+            onValueChange(it.text)
+        },
+        label = label,
+        modifier = modifier.onFocusChanged { focusState ->
+            if (focusState.isFocused && !wasFocused && fieldValue.text.isNotEmpty()) {
+                fieldValue = fieldValue.copy(selection = TextRange(0, fieldValue.text.length))
+            }
+            wasFocused = focusState.isFocused
+        },
+        keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions,
+        singleLine = true,
+        enabled = enabled,
+    )
 }

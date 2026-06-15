@@ -53,10 +53,8 @@ class ActiveSessionViewModel(
                         loadRangeLabel = card.loadRangeLabel,
                         loadUnit = card.loadUnit,
                         restTimeSeconds = card.restTimeSeconds,
-                        suggestedRepsText = card.suggestedReps?.toString().orEmpty(),
-                        suggestedLoadText = card.suggestedLoad?.let(::formatLoad).orEmpty(),
-                        repsInput = override?.reps.orEmpty(),
-                        loadInput = override?.load.orEmpty(),
+                        repsInput = override?.reps ?: card.suggestedReps?.toString().orEmpty(),
+                        loadInput = override?.load ?: card.suggestedLoad?.let(::formatLoad).orEmpty(),
                         notesInput = override?.notes ?: card.suggestedNotes,
                         skipped = override?.skipped ?: card.suggestedSkipped,
                     )
@@ -89,8 +87,8 @@ class ActiveSessionViewModel(
         val current = state.value
         transientUiState.update { it.copy(isSaving = true, errorMessage = null) }
         val entries = current.exerciseCards.mapNotNull { card ->
-            val reps = card.repsInput.ifBlank { card.suggestedRepsText }.toIntOrNull()
-            val load = card.loadInput.ifBlank { card.suggestedLoadText }.toDoubleOrNull()
+            val reps = card.repsInput.toIntOrNull()
+            val load = card.loadInput.toDoubleOrNull()
             if (!card.skipped && (reps == null || load == null)) {
                 transientUiState.update {
                     it.copy(

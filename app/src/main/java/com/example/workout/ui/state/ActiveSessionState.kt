@@ -26,8 +26,6 @@ data class ActiveExerciseCardState(
     val loadRangeLabel: String,
     val loadUnit: LoadUnit,
     val restTimeSeconds: Int,
-    val suggestedRepsText: String,
-    val suggestedLoadText: String,
     val repsInput: String,
     val loadInput: String,
     val notesInput: String,

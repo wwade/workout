@@ -86,11 +86,11 @@ class SessionProgressCalculatorTest {
     }
 
     @Test
-    fun prefersPreviousSetLoadForNextRound() = runTest {
+    fun prefersPreviousSetValuesForNextRound() = runTest {
         val detail = sessionDetail(
             setCount = 3,
-            firstExerciseSets = listOf(setEntry(0, 0, loadActual = 42.5)),
-            secondExerciseSets = listOf(setEntry(1, 0, loadActual = 55.0)),
+            firstExerciseSets = listOf(setEntry(0, 0, repsActual = 7, loadActual = 42.5)),
+            secondExerciseSets = listOf(setEntry(1, 0, repsActual = 9, loadActual = 55.0)),
         )
 
         val snapshot = SessionProgressCalculator.buildSnapshot(
@@ -99,8 +99,33 @@ class SessionProgressCalculatorTest {
         )
 
         assertThat(snapshot.currentSetIndex).isEqualTo(1)
+        assertThat(snapshot.exercises[0].suggestedReps).isEqualTo(7)
         assertThat(snapshot.exercises[0].suggestedLoad).isEqualTo(42.5)
+        assertThat(snapshot.exercises[1].suggestedReps).isEqualTo(9)
         assertThat(snapshot.exercises[1].suggestedLoad).isEqualTo(55.0)
+    }
+
+    @Test
+    fun doesNotCarrySkippedStateFromHistory() = runTest {
+        val detail = sessionDetail(
+            setCount = 3,
+            firstExerciseSets = emptyList(),
+            secondExerciseSets = emptyList(),
+        )
+
+        val snapshot = SessionProgressCalculator.buildSnapshot(
+            detail = detail,
+            prefillProvider = { _, _ ->
+                setEntry(
+                    exerciseSessionId = 999,
+                    setIndex = 0,
+                    loadActual = 30.0,
+                    skipped = true,
+                )
+            },
+        )
+
+        assertThat(snapshot.exercises.all { !it.suggestedSkipped }).isTrue()
     }
 
     private fun sessionDetail(
@@ -161,16 +186,18 @@ class SessionProgressCalculatorTest {
     private fun setEntry(
         exerciseSessionId: Long,
         setIndex: Int,
+        repsActual: Int = 8,
         loadActual: Double = 30.0,
+        skipped: Boolean = false,
     ): SetEntry {
         return SetEntry(
             id = setIndex.toLong() + 1,
             exerciseSessionId = exerciseSessionId,
             setIndex = setIndex,
-            repsActual = 8,
+            repsActual = repsActual,
             loadActual = loadActual,
             notes = "",
-            skipped = false,
+            skipped = skipped,
         )
     }
 }
