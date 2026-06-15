@@ -45,6 +45,9 @@ abstract class WorkoutTemplateDao {
     @Query("SELECT COALESCE(MAX(sortOrder), -1) FROM workout_templates")
     protected abstract suspend fun getMaxWorkoutSortOrder(): Int
 
+    @Query("SELECT COUNT(*) FROM workout_templates")
+    abstract suspend fun countWorkoutTemplates(): Int
+
     @Query("SELECT id FROM circuit_templates WHERE workoutId = :workoutId")
     protected abstract suspend fun getCircuitIdsForWorkout(workoutId: Long): List<Long>
 

@@ -2,7 +2,9 @@ package com.example.workout.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.workout.BuildConfig
 import com.example.workout.domain.model.CircuitDraft
+import com.example.workout.domain.model.DefaultWorkoutDrafts
 import com.example.workout.domain.model.ExerciseDraft
 import com.example.workout.domain.model.WorkoutDraft
 import com.example.workout.domain.repository.WorkoutRepository
@@ -158,13 +160,10 @@ class WorkoutEditorViewModel(
     }
 
     private fun defaultWorkoutDraft(): WorkoutDraft {
-        return WorkoutDraft(
-            circuits = listOf(
-                CircuitDraft(
-                    name = "Circuit 1",
-                    exercises = listOf(ExerciseDraft()),
-                ),
-            ),
-        )
+        return if (BuildConfig.DEBUG) {
+            DefaultWorkoutDrafts.debugWorkoutDraft()
+        } else {
+            DefaultWorkoutDrafts.emptyWorkoutDraft()
+        }
     }
 }
