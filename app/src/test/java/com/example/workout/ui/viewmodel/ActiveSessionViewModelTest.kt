@@ -129,6 +129,35 @@ class ActiveSessionViewModelTest {
         collector.cancel()
     }
 
+    @Test
+    fun unsavedCurrentRoundDraftPersistsAcrossNavigation() = runTest {
+        val repository = FakeSessionRepository(sessionDetailWithTwoCircuits())
+        val viewModel = ActiveSessionViewModel(
+            sessionRepository = repository,
+            sessionId = 1,
+        )
+        val collector = backgroundScope.launch {
+            viewModel.state.collectLatest { }
+        }
+
+        advanceUntilIdle()
+        viewModel.updateReps(exerciseSessionId = 2, value = "12")
+        viewModel.updateLoad(exerciseSessionId = 2, value = "55")
+        advanceUntilIdle()
+
+        viewModel.goToPreviousRound()
+        advanceUntilIdle()
+        assertThat(viewModel.state.value.currentCircuitName).isEqualTo("Cycle 1")
+
+        viewModel.goToNextRound()
+        advanceUntilIdle()
+        val exercise = viewModel.state.value.exerciseCards.single()
+        assertThat(viewModel.state.value.currentCircuitName).isEqualTo("Cycle 2")
+        assertThat(exercise.repsInput).isEqualTo("12")
+        assertThat(exercise.loadInput).isEqualTo("55")
+        collector.cancel()
+    }
+
     private fun sessionDetail(): WorkoutSessionDetail {
         return WorkoutSessionDetail(
             sessionId = 1,

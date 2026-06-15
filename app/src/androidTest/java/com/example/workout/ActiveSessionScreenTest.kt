@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performImeAction
 import com.example.workout.domain.model.LoadUnit
@@ -108,6 +109,68 @@ class ActiveSessionScreenTest {
 
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("reps-1").assertIsDisplayed().assertIsFocused()
+    }
+
+    @Test
+    fun currentRoundDraftSurvivesBackAndForwardNavigation() {
+        var currentSetIndex by mutableStateOf(1)
+        var rounds by mutableStateOf(
+            mapOf(
+                0 to activeSessionState(currentSetIndex = 0),
+                1 to activeSessionState(currentSetIndex = 1),
+            ),
+        )
+
+        fun updateRound(setIndex: Int, transform: ActiveSessionState.() -> ActiveSessionState) {
+            rounds = rounds + (setIndex to rounds.getValue(setIndex).transform())
+        }
+
+        composeRule.setContent {
+            ActiveSessionScreen(
+                state = rounds.getValue(currentSetIndex),
+                onBack = {},
+                onUpdateReps = { exerciseId, value ->
+                    updateRound(currentSetIndex) {
+                        updateExercise(exerciseId) { copy(repsInput = value) }
+                    }
+                },
+                onUpdateLoad = { exerciseId, value ->
+                    updateRound(currentSetIndex) {
+                        updateExercise(exerciseId) { copy(loadInput = value) }
+                    }
+                },
+                onUpdateNotes = { exerciseId, value ->
+                    updateRound(currentSetIndex) {
+                        updateExercise(exerciseId) { copy(notesInput = value) }
+                    }
+                },
+                onUpdateSkipped = { exerciseId, value ->
+                    updateRound(currentSetIndex) {
+                        updateExercise(exerciseId) { copy(skipped = value) }
+                    }
+                },
+                onPreviousRound = { currentSetIndex = 0 },
+                onNextRound = { currentSetIndex = 1 },
+                onSelectRound = { _, setIndex -> currentSetIndex = setIndex },
+                onSaveRound = {},
+                onAbandonSession = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("reps-1").performTextReplacement("11")
+        composeRule.onNodeWithTag("load-1").performTextReplacement("35")
+        composeRule.onNodeWithTag("reps-1").assertTextContains("11")
+        composeRule.onNodeWithTag("load-1").assertTextContains("35")
+
+        composeRule.runOnUiThread { currentSetIndex = 0 }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("reps-1").assertTextContains("8")
+        composeRule.onNodeWithTag("load-1").assertTextContains("30")
+
+        composeRule.runOnUiThread { currentSetIndex = 1 }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("reps-1").assertTextContains("11")
+        composeRule.onNodeWithTag("load-1").assertTextContains("35")
     }
 
     private fun activeSessionState(currentSetIndex: Int, exerciseCount: Int = 2): ActiveSessionState {

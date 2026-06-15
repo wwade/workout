@@ -20,7 +20,7 @@ class ActiveSessionViewModel(
     private val sessionRepository: SessionRepository,
     private val sessionId: Long,
 ) : ViewModel() {
-    private val overrides = MutableStateFlow<Map<Long, EditableEntry>>(emptyMap())
+    private val overrides = MutableStateFlow<Map<RoundKey, Map<Long, EditableEntry>>>(emptyMap())
     private val selectedPosition = MutableStateFlow<SessionProgressCalculator.CurrentPosition?>(null)
     private val transientUiState = MutableStateFlow(TransientUiState())
 
@@ -44,8 +44,13 @@ class ActiveSessionViewModel(
                     }
                 },
             )
+            val activeRoundKey = RoundKey(
+                circuitIndex = progress.currentCircuitIndex,
+                setIndex = progress.currentSetIndex,
+            )
+            val roundOverrides = inputOverrides[activeRoundKey].orEmpty()
             val exerciseCards = progress.exercises.map { card ->
-                val override = inputOverrides[card.exerciseSessionId]
+                val override = roundOverrides[card.exerciseSessionId]
                 ActiveExerciseCardState(
                     exerciseSessionId = card.exerciseSessionId,
                     exerciseTemplateId = card.exerciseTemplateId,
@@ -104,19 +109,19 @@ class ActiveSessionViewModel(
     )
 
     fun updateReps(exerciseSessionId: Long, value: String) {
-        overrides.updateEntry(exerciseSessionId) { copy(reps = value) }
+        overrides.updateEntry(state.value.currentRoundKey(), exerciseSessionId) { copy(reps = value) }
     }
 
     fun updateLoad(exerciseSessionId: Long, value: String) {
-        overrides.updateEntry(exerciseSessionId) { copy(load = value) }
+        overrides.updateEntry(state.value.currentRoundKey(), exerciseSessionId) { copy(load = value) }
     }
 
     fun updateNotes(exerciseSessionId: Long, value: String) {
-        overrides.updateEntry(exerciseSessionId) { copy(notes = value) }
+        overrides.updateEntry(state.value.currentRoundKey(), exerciseSessionId) { copy(notes = value) }
     }
 
     fun updateSkipped(exerciseSessionId: Long, skipped: Boolean) {
-        overrides.updateEntry(exerciseSessionId) { copy(skipped = skipped) }
+        overrides.updateEntry(state.value.currentRoundKey(), exerciseSessionId) { copy(skipped = skipped) }
     }
 
     fun goToPreviousRound() {
@@ -134,7 +139,6 @@ class ActiveSessionViewModel(
         } ?: return
         if (!target.isSelectable) return
         if (current.currentCircuitIndex == circuitIndex && current.currentSetIndex == setIndex) return
-        overrides.value = emptyMap()
         selectedPosition.value = SessionProgressCalculator.CurrentPosition(
             circuitIndex = circuitIndex,
             setIndex = setIndex,
@@ -171,7 +175,8 @@ class ActiveSessionViewModel(
         }
 
         sessionRepository.saveRoundEntries(sessionId = sessionId, entries = entries)
-        overrides.value = emptyMap()
+        val savedRoundKey = current.currentRoundKey()
+        overrides.update { it - savedRoundKey }
         selectedPosition.value = null
         transientUiState.update { it.copy(isSaving = false, errorMessage = null) }
     }
@@ -180,13 +185,15 @@ class ActiveSessionViewModel(
         sessionRepository.abandonSession(sessionId)
     }
 
-    private fun MutableStateFlow<Map<Long, EditableEntry>>.updateEntry(
+    private fun MutableStateFlow<Map<RoundKey, Map<Long, EditableEntry>>>.updateEntry(
+        roundKey: RoundKey,
         exerciseSessionId: Long,
         transform: EditableEntry.() -> EditableEntry,
     ) {
         update { current ->
-            val entry = current[exerciseSessionId] ?: EditableEntry()
-            current + (exerciseSessionId to entry.transform())
+            val roundEntries = current[roundKey].orEmpty()
+            val entry = roundEntries[exerciseSessionId] ?: EditableEntry()
+            current + (roundKey to (roundEntries + (exerciseSessionId to entry.transform())))
         }
     }
 
@@ -211,6 +218,18 @@ class ActiveSessionViewModel(
         val target = positions.getOrNull(currentIndex + offset) ?: return
         selectRound(target.circuitIndex, target.setIndex)
     }
+}
+
+private data class RoundKey(
+    val circuitIndex: Int,
+    val setIndex: Int,
+)
+
+private fun ActiveSessionState.currentRoundKey(): RoundKey {
+    return RoundKey(
+        circuitIndex = currentCircuitIndex,
+        setIndex = currentSetIndex,
+    )
 }
 
 private fun formatLoad(value: Double): String {
