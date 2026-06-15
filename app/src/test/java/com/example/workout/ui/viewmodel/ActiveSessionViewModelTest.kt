@@ -96,6 +96,36 @@ class ActiveSessionViewModelTest {
         advanceUntilIdle()
         assertThat(viewModel.state.value.currentCircuitName).isEqualTo("Cycle 2")
         assertThat(viewModel.state.value.currentSetIndex).isEqualTo(0)
+        assertThat(viewModel.state.value.canGoForward).isFalse()
+        collector.cancel()
+    }
+
+    @Test
+    fun futureUnsavedRoundsAreMarkedUpcomingAndNotSelectable() = runTest {
+        val repository = FakeSessionRepository(sessionDetailWithTwoCircuits())
+        val viewModel = ActiveSessionViewModel(
+            sessionRepository = repository,
+            sessionId = 1,
+        )
+        val collector = backgroundScope.launch {
+            viewModel.state.collectLatest { }
+        }
+
+        advanceUntilIdle()
+
+        val options = viewModel.state.value.positionOptions
+        assertThat(options.map { it.label to it.statusLabel }).containsExactly(
+            "Cycle 1 - Set 1" to "Saved",
+            "Cycle 1 - Set 2" to "Saved",
+            "Cycle 2 - Set 1" to "Current",
+            "Cycle 2 - Set 2" to "Upcoming",
+        ).inOrder()
+        assertThat(options.last().isSelectable).isFalse()
+
+        viewModel.selectRound(circuitIndex = 1, setIndex = 1)
+        advanceUntilIdle()
+        assertThat(viewModel.state.value.currentCircuitName).isEqualTo("Cycle 2")
+        assertThat(viewModel.state.value.currentSetIndex).isEqualTo(0)
         collector.cancel()
     }
 

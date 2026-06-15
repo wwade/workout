@@ -66,11 +66,19 @@ object SessionProgressCalculator {
         val defaultPosition = findCurrentPosition(detail)
         val availablePositions = sortedCircuits.flatMapIndexed { circuitIndex, circuit ->
             List(circuit.setCount) { setIndex ->
+                val isSaved = circuit.exercises.all { exercise ->
+                    exercise.sets.any { it.setIndex == setIndex }
+                }
+                val isCurrentTarget =
+                    defaultPosition?.circuitIndex == circuitIndex && defaultPosition.setIndex == setIndex
                 SessionPositionSnapshot(
                     circuitIndex = circuitIndex,
                     setIndex = setIndex,
                     circuitName = circuit.name,
                     totalSetsInCircuit = circuit.setCount,
+                    isSaved = isSaved,
+                    isCurrentTarget = isCurrentTarget,
+                    isSelectable = isSaved || isCurrentTarget || defaultPosition == null,
                 )
             }
         }

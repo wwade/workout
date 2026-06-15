@@ -61,7 +61,8 @@ class ActiveSessionViewModel(
                     skipped = override?.skipped ?: card.suggestedSkipped,
                 )
             }
-            val currentPositionIndex = progress.availablePositions.indexOfFirst {
+            val selectablePositions = progress.availablePositions.filter { it.isSelectable }
+            val currentSelectableIndex = selectablePositions.indexOfFirst {
                 it.circuitIndex == progress.currentCircuitIndex && it.setIndex == progress.currentSetIndex
             }.coerceAtLeast(0)
             val hasChanges = exerciseCards.hasChangesComparedTo(progress.exercises)
@@ -77,14 +78,20 @@ class ActiveSessionViewModel(
                 isCompleted = progress.isCompleted,
                 isSaving = transient.isSaving,
                 canSaveRound = hasChanges && !transient.isSaving,
-                canGoBack = currentPositionIndex > 0,
-                canGoForward = currentPositionIndex < progress.availablePositions.lastIndex,
+                canGoBack = currentSelectableIndex > 0,
+                canGoForward = currentSelectableIndex >= 0 && currentSelectableIndex < selectablePositions.lastIndex,
                 errorMessage = transient.errorMessage,
                 positionOptions = progress.availablePositions.map { position ->
                     SessionPositionOptionState(
                         circuitIndex = position.circuitIndex,
                         setIndex = position.setIndex,
                         label = "${position.circuitName} - Set ${position.setIndex + 1}",
+                        statusLabel = when {
+                            position.isSaved -> "Saved"
+                            position.isCurrentTarget -> "Current"
+                            else -> "Upcoming"
+                        },
+                        isSelectable = position.isSelectable,
                     )
                 },
                 exerciseCards = exerciseCards,
@@ -122,6 +129,10 @@ class ActiveSessionViewModel(
 
     fun selectRound(circuitIndex: Int, setIndex: Int) {
         val current = state.value
+        val target = current.positionOptions.firstOrNull {
+            it.circuitIndex == circuitIndex && it.setIndex == setIndex
+        } ?: return
+        if (!target.isSelectable) return
         if (current.currentCircuitIndex == circuitIndex && current.currentSetIndex == setIndex) return
         overrides.value = emptyMap()
         selectedPosition.value = SessionProgressCalculator.CurrentPosition(
@@ -192,7 +203,7 @@ class ActiveSessionViewModel(
     )
 
     private fun moveSelection(offset: Int) {
-        val positions = state.value.positionOptions
+        val positions = state.value.positionOptions.filter { it.isSelectable }
         if (positions.isEmpty()) return
         val currentIndex = positions.indexOfFirst {
             it.circuitIndex == state.value.currentCircuitIndex && it.setIndex == state.value.currentSetIndex

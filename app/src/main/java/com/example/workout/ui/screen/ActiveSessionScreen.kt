@@ -26,6 +26,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -126,7 +127,23 @@ fun ActiveSessionScreen(
                             ) {
                                 state.positionOptions.forEach { option ->
                                     DropdownMenuItem(
-                                        text = { Text(option.label) },
+                                        text = {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                            ) {
+                                                Text(option.label)
+                                                Text(
+                                                    option.statusLabel,
+                                                    color = if (option.isSelectable) {
+                                                        MaterialTheme.colorScheme.primary
+                                                    } else {
+                                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                                    },
+                                                )
+                                            }
+                                        },
+                                        enabled = option.isSelectable,
                                         onClick = {
                                             menuExpanded = false
                                             onSelectRound(option.circuitIndex, option.setIndex)
@@ -143,7 +160,25 @@ fun ActiveSessionScreen(
                             )
                         }
                     }
-                    Text("Set ${state.currentSetIndex + 1} of ${state.totalSetsInCircuit}")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Set ${state.currentSetIndex + 1} of ${state.totalSetsInCircuit}")
+                        val currentStatus = state.positionOptions.firstOrNull {
+                            it.circuitIndex == state.currentCircuitIndex && it.setIndex == state.currentSetIndex
+                        }?.statusLabel
+                        if (currentStatus != null) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                shape = MaterialTheme.shapes.small,
+                            ) {
+                                Text(
+                                    text = currentStatus,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                )
+                            }
+                        }
+                    }
                 }
                 TextButton(onClick = onSaveRound, enabled = state.canSaveRound) {
                     Text(if (state.isLastRound && state.isLastCircuit) "Finish" else "Save round")

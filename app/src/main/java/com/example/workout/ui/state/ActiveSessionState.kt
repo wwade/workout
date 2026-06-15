@@ -25,6 +25,8 @@ data class SessionPositionOptionState(
     val circuitIndex: Int,
     val setIndex: Int,
     val label: String,
+    val statusLabel: String,
+    val isSelectable: Boolean,
 )
 
 data class ActiveExerciseCardState(

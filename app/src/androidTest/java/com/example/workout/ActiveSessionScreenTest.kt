@@ -122,9 +122,9 @@ class ActiveSessionScreenTest {
             canGoBack = currentSetIndex > 0,
             canGoForward = currentSetIndex < 2,
             positionOptions = listOf(
-                com.example.workout.ui.state.SessionPositionOptionState(0, 0, "Warmup - Set 1"),
-                com.example.workout.ui.state.SessionPositionOptionState(0, 1, "Warmup - Set 2"),
-                com.example.workout.ui.state.SessionPositionOptionState(0, 2, "Warmup - Set 3"),
+                com.example.workout.ui.state.SessionPositionOptionState(0, 0, "Warmup - Set 1", "Saved", true),
+                com.example.workout.ui.state.SessionPositionOptionState(0, 1, "Warmup - Set 2", "Current", true),
+                com.example.workout.ui.state.SessionPositionOptionState(0, 2, "Warmup - Set 3", "Upcoming", false),
             ),
             exerciseCards = (1..exerciseCount).map { index ->
                 exerciseCard(

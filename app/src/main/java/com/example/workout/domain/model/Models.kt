@@ -164,6 +164,9 @@ data class SessionPositionSnapshot(
     val setIndex: Int,
     val circuitName: String,
     val totalSetsInCircuit: Int,
+    val isSaved: Boolean,
+    val isCurrentTarget: Boolean,
+    val isSelectable: Boolean,
 )
 
 data class ExerciseProgressSnapshot(
