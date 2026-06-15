@@ -158,6 +158,27 @@ class ActiveSessionViewModelTest {
         collector.cancel()
     }
 
+    @Test
+    fun currentUnsavedRoundCanBeSavedWithUnchangedPrefillValues() = runTest {
+        val repository = FakeSessionRepository(sessionDetailWithTwoCircuits())
+        val viewModel = ActiveSessionViewModel(
+            sessionRepository = repository,
+            sessionId = 1,
+        )
+        val collector = backgroundScope.launch {
+            viewModel.state.collectLatest { }
+        }
+
+        advanceUntilIdle()
+        val state = viewModel.state.value
+        assertThat(state.currentCircuitName).isEqualTo("Cycle 2")
+        assertThat(state.currentSetIndex).isEqualTo(0)
+        assertThat(state.exerciseCards.single().repsInput).isEqualTo("8")
+        assertThat(state.exerciseCards.single().loadInput).isEqualTo("30")
+        assertThat(state.canSaveRound).isTrue()
+        collector.cancel()
+    }
+
     private fun sessionDetail(): WorkoutSessionDetail {
         return WorkoutSessionDetail(
             sessionId = 1,

@@ -5,10 +5,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performImeAction
@@ -171,6 +173,57 @@ class ActiveSessionScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("reps-1").assertTextContains("11")
         composeRule.onNodeWithTag("load-1").assertTextContains("35")
+    }
+
+    @Test
+    fun currentUnsavedRoundCanSaveWhenValuesMatchPrefill() {
+        var state by mutableStateOf(
+            activeSessionState(currentSetIndex = 1).copy(
+                currentCircuitName = "Cycle 2",
+                positionOptions = listOf(
+                    com.example.workout.ui.state.SessionPositionOptionState(0, 0, "Cycle 1 - Set 1", "Saved", true),
+                    com.example.workout.ui.state.SessionPositionOptionState(0, 1, "Cycle 2 - Set 1", "Current", true),
+                    com.example.workout.ui.state.SessionPositionOptionState(0, 2, "Cycle 2 - Set 2", "Upcoming", false),
+                ),
+                exerciseCards = listOf(
+                    exerciseCard(
+                        exerciseSessionId = 1,
+                        exerciseName = "Exercise 1",
+                        repsInput = "8",
+                        loadInput = "30",
+                    ),
+                ),
+                canSaveRound = true,
+            ),
+        )
+
+        composeRule.setContent {
+            ActiveSessionScreen(
+                state = state,
+                onBack = {},
+                onUpdateReps = { exerciseId, value ->
+                    state = state.updateExercise(exerciseId) { copy(repsInput = value) }
+                },
+                onUpdateLoad = { exerciseId, value ->
+                    state = state.updateExercise(exerciseId) { copy(loadInput = value) }
+                },
+                onUpdateNotes = { exerciseId, value ->
+                    state = state.updateExercise(exerciseId) { copy(notesInput = value) }
+                },
+                onUpdateSkipped = { exerciseId, value ->
+                    state = state.updateExercise(exerciseId) { copy(skipped = value) }
+                },
+                onPreviousRound = {},
+                onNextRound = {},
+                onSelectRound = { _, _ -> },
+                onSaveRound = {},
+                onAbandonSession = {},
+            )
+        }
+
+        composeRule.onNodeWithText("Save round").assertIsEnabled()
+        composeRule.onNodeWithTag("reps-1").assertTextContains("8")
+        composeRule.onNodeWithTag("load-1").assertTextContains("30")
     }
 
     private fun activeSessionState(currentSetIndex: Int, exerciseCount: Int = 2): ActiveSessionState {

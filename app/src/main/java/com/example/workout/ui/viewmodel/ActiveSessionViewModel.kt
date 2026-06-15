@@ -66,11 +66,19 @@ class ActiveSessionViewModel(
                     skipped = override?.skipped ?: card.suggestedSkipped,
                 )
             }
+            val currentPosition = progress.availablePositions.firstOrNull {
+                it.circuitIndex == progress.currentCircuitIndex && it.setIndex == progress.currentSetIndex
+            }
             val selectablePositions = progress.availablePositions.filter { it.isSelectable }
             val currentSelectableIndex = selectablePositions.indexOfFirst {
                 it.circuitIndex == progress.currentCircuitIndex && it.setIndex == progress.currentSetIndex
             }.coerceAtLeast(0)
             val hasChanges = exerciseCards.hasChangesComparedTo(progress.exercises)
+            val canSaveRound = when {
+                transient.isSaving -> false
+                currentPosition?.isSaved == true -> hasChanges
+                else -> true
+            }
             ActiveSessionState(
                 sessionId = progress.sessionId,
                 workoutName = progress.workoutName,
@@ -82,7 +90,7 @@ class ActiveSessionViewModel(
                 isLastCircuit = progress.isLastCircuit,
                 isCompleted = progress.isCompleted,
                 isSaving = transient.isSaving,
-                canSaveRound = hasChanges && !transient.isSaving,
+                canSaveRound = canSaveRound,
                 canGoBack = currentSelectableIndex > 0,
                 canGoForward = currentSelectableIndex >= 0 && currentSelectableIndex < selectablePositions.lastIndex,
                 errorMessage = transient.errorMessage,
