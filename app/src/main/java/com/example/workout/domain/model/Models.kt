@@ -155,7 +155,15 @@ data class SessionProgressSnapshot(
     val isLastRound: Boolean,
     val isLastCircuit: Boolean,
     val isCompleted: Boolean,
+    val availablePositions: List<SessionPositionSnapshot>,
     val exercises: List<ExerciseProgressSnapshot>,
+)
+
+data class SessionPositionSnapshot(
+    val circuitIndex: Int,
+    val setIndex: Int,
+    val circuitName: String,
+    val totalSetsInCircuit: Int,
 )
 
 data class ExerciseProgressSnapshot(

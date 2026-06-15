@@ -49,6 +49,56 @@ class ActiveSessionViewModelTest {
         collector.cancel()
     }
 
+    @Test
+    fun selectingCompletedRoundWithoutEditsDisablesSave() = runTest {
+        val repository = FakeSessionRepository(sessionDetailWithSavedRounds())
+        val viewModel = ActiveSessionViewModel(
+            sessionRepository = repository,
+            sessionId = 1,
+        )
+        val collector = backgroundScope.launch {
+            viewModel.state.collectLatest { }
+        }
+
+        advanceUntilIdle()
+        viewModel.selectRound(circuitIndex = 0, setIndex = 0)
+        advanceUntilIdle()
+
+        val state = viewModel.state.value
+        assertThat(state.currentCircuitName).isEqualTo("Cycle 1")
+        assertThat(state.currentSetIndex).isEqualTo(0)
+        assertThat(state.exerciseCards.single().repsInput).isEqualTo("7")
+        assertThat(state.canSaveRound).isFalse()
+        collector.cancel()
+    }
+
+    @Test
+    fun nextAndPreviousRoundNavigateAcrossCircuits() = runTest {
+        val repository = FakeSessionRepository(sessionDetailWithTwoCircuits())
+        val viewModel = ActiveSessionViewModel(
+            sessionRepository = repository,
+            sessionId = 1,
+        )
+        val collector = backgroundScope.launch {
+            viewModel.state.collectLatest { }
+        }
+
+        advanceUntilIdle()
+        assertThat(viewModel.state.value.currentCircuitName).isEqualTo("Cycle 2")
+        assertThat(viewModel.state.value.currentSetIndex).isEqualTo(0)
+
+        viewModel.goToPreviousRound()
+        advanceUntilIdle()
+        assertThat(viewModel.state.value.currentCircuitName).isEqualTo("Cycle 1")
+        assertThat(viewModel.state.value.currentSetIndex).isEqualTo(1)
+
+        viewModel.goToNextRound()
+        advanceUntilIdle()
+        assertThat(viewModel.state.value.currentCircuitName).isEqualTo("Cycle 2")
+        assertThat(viewModel.state.value.currentSetIndex).isEqualTo(0)
+        collector.cancel()
+    }
+
     private fun sessionDetail(): WorkoutSessionDetail {
         return WorkoutSessionDetail(
             sessionId = 1,
@@ -85,6 +135,133 @@ class ActiveSessionViewModelTest {
             ),
         )
     }
+
+    private fun sessionDetailWithSavedRounds(): WorkoutSessionDetail {
+        return WorkoutSessionDetail(
+            sessionId = 1,
+            workoutTemplateId = 10,
+            workoutName = "Part one",
+            startedAt = 0L,
+            completedAt = null,
+            status = SessionStatus.IN_PROGRESS,
+            circuits = listOf(
+                CircuitSessionDetail(
+                    circuitSessionId = 1,
+                    circuitTemplateId = 1,
+                    name = "Cycle 1",
+                    sortOrder = 0,
+                    setCount = 3,
+                    exercises = listOf(
+                        ExerciseSessionDetail(
+                            exerciseSessionId = 1,
+                            exerciseTemplateId = 101,
+                            name = "Press",
+                            guidance = "",
+                            repMin = 6,
+                            repMax = 8,
+                            loadKind = LoadKind.WEIGHT,
+                            loadMin = 20.0,
+                            loadMax = 40.0,
+                            loadUnit = LoadUnit.LB,
+                            restTimeSeconds = 60,
+                            sortOrder = 0,
+                            sets = listOf(
+                                SetEntry(
+                                    id = 1,
+                                    exerciseSessionId = 1,
+                                    setIndex = 0,
+                                    repsActual = 7,
+                                    loadActual = 25.0,
+                                    notes = "steady",
+                                    skipped = false,
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+    }
+
+    private fun sessionDetailWithTwoCircuits(): WorkoutSessionDetail {
+        return WorkoutSessionDetail(
+            sessionId = 1,
+            workoutTemplateId = 10,
+            workoutName = "Part one",
+            startedAt = 0L,
+            completedAt = null,
+            status = SessionStatus.IN_PROGRESS,
+            circuits = listOf(
+                CircuitSessionDetail(
+                    circuitSessionId = 1,
+                    circuitTemplateId = 1,
+                    name = "Cycle 1",
+                    sortOrder = 0,
+                    setCount = 2,
+                    exercises = listOf(
+                        ExerciseSessionDetail(
+                            exerciseSessionId = 1,
+                            exerciseTemplateId = 101,
+                            name = "Press",
+                            guidance = "",
+                            repMin = 6,
+                            repMax = 8,
+                            loadKind = LoadKind.WEIGHT,
+                            loadMin = 20.0,
+                            loadMax = 40.0,
+                            loadUnit = LoadUnit.LB,
+                            restTimeSeconds = 60,
+                            sortOrder = 0,
+                            sets = listOf(
+                                SetEntry(
+                                    id = 1,
+                                    exerciseSessionId = 1,
+                                    setIndex = 0,
+                                    repsActual = 7,
+                                    loadActual = 25.0,
+                                    notes = "",
+                                    skipped = false,
+                                ),
+                                SetEntry(
+                                    id = 2,
+                                    exerciseSessionId = 1,
+                                    setIndex = 1,
+                                    repsActual = 8,
+                                    loadActual = 30.0,
+                                    notes = "",
+                                    skipped = false,
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                CircuitSessionDetail(
+                    circuitSessionId = 2,
+                    circuitTemplateId = 2,
+                    name = "Cycle 2",
+                    sortOrder = 1,
+                    setCount = 2,
+                    exercises = listOf(
+                        ExerciseSessionDetail(
+                            exerciseSessionId = 2,
+                            exerciseTemplateId = 102,
+                            name = "Row",
+                            guidance = "",
+                            repMin = 8,
+                            repMax = 10,
+                            loadKind = LoadKind.WEIGHT,
+                            loadMin = 30.0,
+                            loadMax = 50.0,
+                            loadUnit = LoadUnit.LB,
+                            restTimeSeconds = 60,
+                            sortOrder = 0,
+                            sets = emptyList(),
+                        ),
+                    ),
+                ),
+            ),
+        )
+    }
 }
 
 private class FakeSessionRepository(
@@ -98,7 +275,36 @@ private class FakeSessionRepository(
 
     override suspend fun abandonSession(sessionId: Long) = Unit
 
-    override suspend fun saveRoundEntries(sessionId: Long, entries: List<SetEntryDraft>) = Unit
+    override suspend fun saveRoundEntries(sessionId: Long, entries: List<SetEntryDraft>) {
+        detailFlow.value = detailFlow.value.copy(
+            circuits = detailFlow.value.circuits.map { circuit ->
+                circuit.copy(
+                    exercises = circuit.exercises.map { exercise ->
+                        val matchingEntries = entries.filter { it.exerciseSessionId == exercise.exerciseSessionId }
+                        if (matchingEntries.isEmpty()) {
+                            exercise
+                        } else {
+                            exercise.copy(
+                                sets = (exercise.sets.filter { existing ->
+                                    matchingEntries.none { it.setIndex == existing.setIndex }
+                                } + matchingEntries.mapIndexed { index, entry ->
+                                    SetEntry(
+                                        id = 10_000L + index,
+                                        exerciseSessionId = entry.exerciseSessionId,
+                                        setIndex = entry.setIndex,
+                                        repsActual = entry.repsActual,
+                                        loadActual = entry.loadActual,
+                                        notes = entry.notes,
+                                        skipped = entry.skipped,
+                                    )
+                                }).sortedBy { it.setIndex },
+                            )
+                        }
+                    },
+                )
+            },
+        )
+    }
 
     override fun observeSessionDetail(sessionId: Long): Flow<WorkoutSessionDetail?> = detailFlow
 

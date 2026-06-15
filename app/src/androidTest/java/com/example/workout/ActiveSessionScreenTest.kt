@@ -42,6 +42,9 @@ class ActiveSessionScreenTest {
                 onUpdateSkipped = { exerciseId, value ->
                     state = state.updateExercise(exerciseId) { copy(skipped = value) }
                 },
+                onPreviousRound = {},
+                onNextRound = {},
+                onSelectRound = { _, _ -> },
                 onSaveRound = {},
                 onAbandonSession = {},
             )
@@ -88,6 +91,9 @@ class ActiveSessionScreenTest {
                 onUpdateSkipped = { exerciseId, value ->
                     state = state.updateExercise(exerciseId) { copy(skipped = value) }
                 },
+                onPreviousRound = {},
+                onNextRound = {},
+                onSelectRound = { _, _ -> },
                 onSaveRound = {},
                 onAbandonSession = {},
             )
@@ -112,6 +118,14 @@ class ActiveSessionScreenTest {
             currentCircuitName = "Warmup",
             currentSetIndex = currentSetIndex,
             totalSetsInCircuit = 3,
+            canSaveRound = true,
+            canGoBack = currentSetIndex > 0,
+            canGoForward = currentSetIndex < 2,
+            positionOptions = listOf(
+                com.example.workout.ui.state.SessionPositionOptionState(0, 0, "Warmup - Set 1"),
+                com.example.workout.ui.state.SessionPositionOptionState(0, 1, "Warmup - Set 2"),
+                com.example.workout.ui.state.SessionPositionOptionState(0, 2, "Warmup - Set 3"),
+            ),
             exerciseCards = (1..exerciseCount).map { index ->
                 exerciseCard(
                     exerciseSessionId = index.toLong(),

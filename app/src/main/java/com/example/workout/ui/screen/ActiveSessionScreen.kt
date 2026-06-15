@@ -1,20 +1,28 @@
 package com.example.workout.ui.screen
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -41,6 +49,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import com.example.workout.ui.state.ActiveSessionState
 import kotlinx.coroutines.launch
 
@@ -53,6 +64,9 @@ fun ActiveSessionScreen(
     onUpdateLoad: (Long, String) -> Unit,
     onUpdateNotes: (Long, String) -> Unit,
     onUpdateSkipped: (Long, Boolean) -> Unit,
+    onPreviousRound: () -> Unit,
+    onNextRound: () -> Unit,
+    onSelectRound: (Int, Int) -> Unit,
     onSaveRound: () -> Unit,
     onAbandonSession: () -> Unit,
 ) {
@@ -62,6 +76,7 @@ fun ActiveSessionScreen(
     val exerciseIds = state.exerciseCards.map { it.exerciseSessionId }
     val repsFocusRequesters = remember(exerciseIds) { exerciseIds.map { FocusRequester() } }
     val loadFocusRequesters = remember(exerciseIds) { exerciseIds.map { FocusRequester() } }
+    var menuExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.currentCircuitIndex, state.currentSetIndex, state.isCompleted) {
         if (!state.isCompleted) {
@@ -88,10 +103,49 @@ fun ActiveSessionScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Column {
-                    Text(state.currentCircuitName, style = MaterialTheme.typography.titleMedium)
+                    Row {
+                        IconButton(onClick = onPreviousRound, enabled = state.canGoBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Previous set",
+                            )
+                        }
+                        Spacer(Modifier.width(4.dp))
+                        Box {
+                            TextButton(
+                                onClick = { menuExpanded = true },
+                                colors = ButtonDefaults.textButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.onSurface,
+                                ),
+                            ) {
+                                Text("${state.currentCircuitName} - Set ${state.currentSetIndex + 1}")
+                            }
+                            DropdownMenu(
+                                expanded = menuExpanded,
+                                onDismissRequest = { menuExpanded = false },
+                            ) {
+                                state.positionOptions.forEach { option ->
+                                    DropdownMenuItem(
+                                        text = { Text(option.label) },
+                                        onClick = {
+                                            menuExpanded = false
+                                            onSelectRound(option.circuitIndex, option.setIndex)
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(Modifier.width(4.dp))
+                        IconButton(onClick = onNextRound, enabled = state.canGoForward) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = "Next set",
+                            )
+                        }
+                    }
                     Text("Set ${state.currentSetIndex + 1} of ${state.totalSetsInCircuit}")
                 }
-                TextButton(onClick = onSaveRound, enabled = !state.isSaving) {
+                TextButton(onClick = onSaveRound, enabled = state.canSaveRound) {
                     Text(if (state.isLastRound && state.isLastCircuit) "Finish" else "Save round")
                 }
             }

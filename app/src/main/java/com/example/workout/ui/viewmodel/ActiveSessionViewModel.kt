@@ -2,11 +2,13 @@ package com.example.workout.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.workout.domain.model.ExerciseProgressSnapshot
 import com.example.workout.domain.model.SetEntryDraft
 import com.example.workout.domain.repository.SessionRepository
-import com.example.workout.domain.usecase.GetSessionProgressUseCase
+import com.example.workout.domain.usecase.SessionProgressCalculator
 import com.example.workout.ui.state.ActiveExerciseCardState
 import com.example.workout.ui.state.ActiveSessionState
+import com.example.workout.ui.state.SessionPositionOptionState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -18,18 +20,51 @@ class ActiveSessionViewModel(
     private val sessionRepository: SessionRepository,
     private val sessionId: Long,
 ) : ViewModel() {
-    private val progressUseCase = GetSessionProgressUseCase(sessionRepository)
     private val overrides = MutableStateFlow<Map<Long, EditableEntry>>(emptyMap())
+    private val selectedPosition = MutableStateFlow<SessionProgressCalculator.CurrentPosition?>(null)
     private val transientUiState = MutableStateFlow(TransientUiState())
 
     val state: StateFlow<ActiveSessionState> = combine(
-        progressUseCase(sessionId),
+        sessionRepository.observeSessionDetail(sessionId),
+        selectedPosition,
         overrides,
         transientUiState,
-    ) { progress, inputOverrides, transient ->
-        if (progress == null) {
+    ) { detail, selected, inputOverrides, transient ->
+        if (detail == null) {
             ActiveSessionState(errorMessage = "Session not found.")
         } else {
+            val selectedOrFallback = selected
+                ?.takeIf { position -> SessionProgressCalculator.listPositions(detail).contains(position) }
+            val progress = SessionProgressCalculator.buildSnapshot(
+                detail = detail,
+                selectedPosition = selectedOrFallback,
+                prefillProvider = { exerciseTemplateId, setIndex ->
+                    exerciseTemplateId?.let { id ->
+                        sessionRepository.getLatestCompletedSetEntry(id, setIndex)
+                    }
+                },
+            )
+            val exerciseCards = progress.exercises.map { card ->
+                val override = inputOverrides[card.exerciseSessionId]
+                ActiveExerciseCardState(
+                    exerciseSessionId = card.exerciseSessionId,
+                    exerciseTemplateId = card.exerciseTemplateId,
+                    exerciseName = card.exerciseName,
+                    guidance = card.guidance,
+                    repRangeLabel = card.repRangeLabel,
+                    loadRangeLabel = card.loadRangeLabel,
+                    loadUnit = card.loadUnit,
+                    restTimeSeconds = card.restTimeSeconds,
+                    repsInput = override?.reps ?: card.suggestedReps?.toString().orEmpty(),
+                    loadInput = override?.load ?: card.suggestedLoad?.let(::formatLoad).orEmpty(),
+                    notesInput = override?.notes ?: card.suggestedNotes,
+                    skipped = override?.skipped ?: card.suggestedSkipped,
+                )
+            }
+            val currentPositionIndex = progress.availablePositions.indexOfFirst {
+                it.circuitIndex == progress.currentCircuitIndex && it.setIndex == progress.currentSetIndex
+            }.coerceAtLeast(0)
+            val hasChanges = exerciseCards.hasChangesComparedTo(progress.exercises)
             ActiveSessionState(
                 sessionId = progress.sessionId,
                 workoutName = progress.workoutName,
@@ -41,24 +76,18 @@ class ActiveSessionViewModel(
                 isLastCircuit = progress.isLastCircuit,
                 isCompleted = progress.isCompleted,
                 isSaving = transient.isSaving,
+                canSaveRound = hasChanges && !transient.isSaving,
+                canGoBack = currentPositionIndex > 0,
+                canGoForward = currentPositionIndex < progress.availablePositions.lastIndex,
                 errorMessage = transient.errorMessage,
-                exerciseCards = progress.exercises.map { card ->
-                    val override = inputOverrides[card.exerciseSessionId]
-                    ActiveExerciseCardState(
-                        exerciseSessionId = card.exerciseSessionId,
-                        exerciseTemplateId = card.exerciseTemplateId,
-                        exerciseName = card.exerciseName,
-                        guidance = card.guidance,
-                        repRangeLabel = card.repRangeLabel,
-                        loadRangeLabel = card.loadRangeLabel,
-                        loadUnit = card.loadUnit,
-                        restTimeSeconds = card.restTimeSeconds,
-                        repsInput = override?.reps ?: card.suggestedReps?.toString().orEmpty(),
-                        loadInput = override?.load ?: card.suggestedLoad?.let(::formatLoad).orEmpty(),
-                        notesInput = override?.notes ?: card.suggestedNotes,
-                        skipped = override?.skipped ?: card.suggestedSkipped,
+                positionOptions = progress.availablePositions.map { position ->
+                    SessionPositionOptionState(
+                        circuitIndex = position.circuitIndex,
+                        setIndex = position.setIndex,
+                        label = "${position.circuitName} - Set ${position.setIndex + 1}",
                     )
                 },
+                exerciseCards = exerciseCards,
             )
         }
     }.stateIn(
@@ -83,8 +112,30 @@ class ActiveSessionViewModel(
         overrides.updateEntry(exerciseSessionId) { copy(skipped = skipped) }
     }
 
+    fun goToPreviousRound() {
+        moveSelection(offset = -1)
+    }
+
+    fun goToNextRound() {
+        moveSelection(offset = 1)
+    }
+
+    fun selectRound(circuitIndex: Int, setIndex: Int) {
+        val current = state.value
+        if (current.currentCircuitIndex == circuitIndex && current.currentSetIndex == setIndex) return
+        overrides.value = emptyMap()
+        selectedPosition.value = SessionProgressCalculator.CurrentPosition(
+            circuitIndex = circuitIndex,
+            setIndex = setIndex,
+        )
+        transientUiState.update { it.copy(errorMessage = null) }
+    }
+
     suspend fun saveRound() {
         val current = state.value
+        if (!current.canSaveRound) {
+            return
+        }
         transientUiState.update { it.copy(isSaving = true, errorMessage = null) }
         val entries = current.exerciseCards.mapNotNull { card ->
             val reps = card.repsInput.toIntOrNull()
@@ -110,6 +161,7 @@ class ActiveSessionViewModel(
 
         sessionRepository.saveRoundEntries(sessionId = sessionId, entries = entries)
         overrides.value = emptyMap()
+        selectedPosition.value = null
         transientUiState.update { it.copy(isSaving = false, errorMessage = null) }
     }
 
@@ -138,6 +190,16 @@ class ActiveSessionViewModel(
         val isSaving: Boolean = false,
         val errorMessage: String? = null,
     )
+
+    private fun moveSelection(offset: Int) {
+        val positions = state.value.positionOptions
+        if (positions.isEmpty()) return
+        val currentIndex = positions.indexOfFirst {
+            it.circuitIndex == state.value.currentCircuitIndex && it.setIndex == state.value.currentSetIndex
+        }.coerceAtLeast(0)
+        val target = positions.getOrNull(currentIndex + offset) ?: return
+        selectRound(target.circuitIndex, target.setIndex)
+    }
 }
 
 private fun formatLoad(value: Double): String {
@@ -145,5 +207,17 @@ private fun formatLoad(value: Double): String {
         value.toInt().toString()
     } else {
         value.toString()
+    }
+}
+
+private fun List<ActiveExerciseCardState>.hasChangesComparedTo(
+    snapshots: List<ExerciseProgressSnapshot>,
+): Boolean {
+    if (size != snapshots.size) return true
+    return zip(snapshots).any { (card, snapshot) ->
+        card.repsInput != snapshot.suggestedReps?.toString().orEmpty() ||
+            card.loadInput != snapshot.suggestedLoad?.let(::formatLoad).orEmpty() ||
+            card.notesInput != snapshot.suggestedNotes ||
+            card.skipped != snapshot.suggestedSkipped
     }
 }

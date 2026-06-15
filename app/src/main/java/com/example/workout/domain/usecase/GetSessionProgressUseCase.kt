@@ -1,6 +1,7 @@
 package com.example.workout.domain.usecase
 
 import com.example.workout.domain.model.ExerciseProgressSnapshot
+import com.example.workout.domain.model.SessionPositionSnapshot
 import com.example.workout.domain.model.SetEntry
 import com.example.workout.domain.model.SessionProgressSnapshot
 import com.example.workout.domain.model.WorkoutSessionDetail
@@ -30,6 +31,16 @@ class GetSessionProgressUseCase(
 object SessionProgressCalculator {
     fun isCompleted(detail: WorkoutSessionDetail): Boolean = findCurrentPosition(detail) == null
 
+    fun listPositions(detail: WorkoutSessionDetail): List<CurrentPosition> {
+        return detail.circuits
+            .sortedBy { it.sortOrder }
+            .flatMapIndexed { circuitIndex, circuit ->
+                List(circuit.setCount) { setIndex ->
+                    CurrentPosition(circuitIndex = circuitIndex, setIndex = setIndex)
+                }
+            }
+    }
+
     fun findCurrentPosition(detail: WorkoutSessionDetail): CurrentPosition? {
         val sortedCircuits = detail.circuits.sortedBy { it.sortOrder }
         sortedCircuits.forEachIndexed { circuitIndex, circuit ->
@@ -48,12 +59,27 @@ object SessionProgressCalculator {
 
     suspend fun buildSnapshot(
         detail: WorkoutSessionDetail,
+        selectedPosition: CurrentPosition? = null,
         prefillProvider: suspend (Long?, Int) -> SetEntry?,
     ): SessionProgressSnapshot {
         val sortedCircuits = detail.circuits.sortedBy { it.sortOrder }
-        val position = findCurrentPosition(detail)
-        val isCompleted = position == null
-        val activeCircuitIndex = position?.circuitIndex ?: (sortedCircuits.lastIndex).coerceAtLeast(0)
+        val defaultPosition = findCurrentPosition(detail)
+        val availablePositions = sortedCircuits.flatMapIndexed { circuitIndex, circuit ->
+            List(circuit.setCount) { setIndex ->
+                SessionPositionSnapshot(
+                    circuitIndex = circuitIndex,
+                    setIndex = setIndex,
+                    circuitName = circuit.name,
+                    totalSetsInCircuit = circuit.setCount,
+                )
+            }
+        }
+        val fallbackPosition = defaultPosition ?: availablePositions.lastOrNull()?.let {
+            CurrentPosition(circuitIndex = it.circuitIndex, setIndex = it.setIndex)
+        }
+        val position = selectedPosition ?: fallbackPosition
+        val isCompleted = defaultPosition == null
+        val activeCircuitIndex = position?.circuitIndex ?: 0
         val activeCircuit = sortedCircuits.getOrElse(activeCircuitIndex) {
             return SessionProgressSnapshot(
                 sessionId = detail.sessionId,
@@ -65,11 +91,13 @@ object SessionProgressCalculator {
                 isLastRound = true,
                 isLastCircuit = true,
                 isCompleted = true,
+                availablePositions = emptyList(),
                 exercises = emptyList(),
             )
         }
-        val activeSetIndex = position?.setIndex ?: (activeCircuit.setCount - 1).coerceAtLeast(0)
+        val activeSetIndex = position?.setIndex ?: 0
         val exercises = activeCircuit.exercises.sortedBy { it.sortOrder }.map { exercise ->
+            val currentSet = exercise.sets.firstOrNull { it.setIndex == activeSetIndex }
             val prefill = prefillProvider(exercise.exerciseTemplateId, activeSetIndex)
             val previousSet = exercise.sets
                 .filter { it.setIndex < activeSetIndex }
@@ -83,10 +111,10 @@ object SessionProgressCalculator {
                 loadRangeLabel = buildLoadRangeLabel(exercise.loadMin, exercise.loadMax, exercise.loadUnit.name.lowercase()),
                 loadUnit = exercise.loadUnit,
                 restTimeSeconds = exercise.restTimeSeconds,
-                suggestedReps = previousSet?.repsActual ?: prefill?.repsActual,
-                suggestedLoad = previousSet?.loadActual ?: prefill?.loadActual,
-                suggestedNotes = prefill?.notes.orEmpty(),
-                suggestedSkipped = false,
+                suggestedReps = currentSet?.repsActual ?: previousSet?.repsActual ?: prefill?.repsActual,
+                suggestedLoad = currentSet?.loadActual ?: previousSet?.loadActual ?: prefill?.loadActual,
+                suggestedNotes = currentSet?.notes ?: prefill?.notes.orEmpty(),
+                suggestedSkipped = currentSet?.skipped ?: false,
             )
         }
         return SessionProgressSnapshot(
@@ -99,6 +127,7 @@ object SessionProgressCalculator {
             isLastRound = activeSetIndex == activeCircuit.setCount - 1,
             isLastCircuit = activeCircuitIndex == sortedCircuits.lastIndex,
             isCompleted = isCompleted,
+            availablePositions = availablePositions,
             exercises = exercises,
         )
     }

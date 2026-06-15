@@ -13,8 +13,18 @@ data class ActiveSessionState(
     val isLastCircuit: Boolean = false,
     val isCompleted: Boolean = false,
     val isSaving: Boolean = false,
+    val canSaveRound: Boolean = false,
+    val canGoBack: Boolean = false,
+    val canGoForward: Boolean = false,
     val errorMessage: String? = null,
+    val positionOptions: List<SessionPositionOptionState> = emptyList(),
     val exerciseCards: List<ActiveExerciseCardState> = emptyList(),
+)
+
+data class SessionPositionOptionState(
+    val circuitIndex: Int,
+    val setIndex: Int,
+    val label: String,
 )
 
 data class ActiveExerciseCardState(

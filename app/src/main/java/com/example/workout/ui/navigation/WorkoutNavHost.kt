@@ -132,6 +132,9 @@ fun WorkoutNavHost(
                 onUpdateLoad = viewModel::updateLoad,
                 onUpdateNotes = viewModel::updateNotes,
                 onUpdateSkipped = viewModel::updateSkipped,
+                onPreviousRound = viewModel::goToPreviousRound,
+                onNextRound = viewModel::goToNextRound,
+                onSelectRound = viewModel::selectRound,
                 onSaveRound = { scope.launch { viewModel.saveRound() } },
                 onAbandonSession = {
                     scope.launch {
