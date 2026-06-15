@@ -1,0 +1,180 @@
+package com.example.workout.ui.screen
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.text.KeyboardOptions
+import com.example.workout.ui.state.ActiveSessionState
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ActiveSessionScreen(
+    state: ActiveSessionState,
+    onBack: () -> Unit,
+    onUpdateReps: (Long, String) -> Unit,
+    onUpdateLoad: (Long, String) -> Unit,
+    onUpdateNotes: (Long, String) -> Unit,
+    onUpdateSkipped: (Long, Boolean) -> Unit,
+    onSaveRound: () -> Unit,
+    onAbandonSession: () -> Unit,
+) {
+    val focusManager = LocalFocusManager.current
+    val firstRepsFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(state.currentCircuitIndex, state.currentSetIndex) {
+        if (state.exerciseCards.isNotEmpty() && !state.isCompleted) {
+            firstRepsFocusRequester.requestFocus()
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(state.workoutName.ifBlank { "Active session" }) },
+                navigationIcon = { TextButton(onClick = onBack) { Text("Back") } },
+                actions = {
+                    TextButton(onClick = onAbandonSession) { Text("Abandon") }
+                },
+            )
+        },
+        bottomBar = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column {
+                    Text(state.currentCircuitName, style = MaterialTheme.typography.titleMedium)
+                    Text("Set ${state.currentSetIndex + 1} of ${state.totalSetsInCircuit}")
+                }
+                TextButton(onClick = onSaveRound, enabled = !state.isSaving) {
+                    Text(if (state.isLastRound && state.isLastCircuit) "Finish" else "Save round")
+                }
+            }
+        },
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            state.errorMessage?.let { error ->
+                item {
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+
+            items(state.exerciseCards, key = { it.exerciseSessionId }) { exercise ->
+                val isFirstExercise = exercise.exerciseSessionId == state.exerciseCards.firstOrNull()?.exerciseSessionId
+                Card {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(exercise.exerciseName, style = MaterialTheme.typography.titleMedium)
+                        if (exercise.guidance.isNotBlank()) {
+                            Text(exercise.guidance)
+                        }
+                        Text("Target reps: ${exercise.repRangeLabel}")
+                        Text("Target load: ${exercise.loadRangeLabel}")
+                        Text("Rest: ${exercise.restTimeSeconds} sec")
+                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = exercise.skipped,
+                                onCheckedChange = { onUpdateSkipped(exercise.exerciseSessionId, it) },
+                            )
+                            Text("Skip this set")
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            OutlinedTextField(
+                                value = exercise.repsInput,
+                                onValueChange = { onUpdateReps(exercise.exerciseSessionId, it) },
+                                label = { Text("Reps") },
+                                placeholder = {
+                                    if (exercise.suggestedRepsText.isNotEmpty()) {
+                                        Text(exercise.suggestedRepsText)
+                                    }
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .then(
+                                        if (isFirstExercise) {
+                                            Modifier.focusRequester(firstRepsFocusRequester)
+                                        } else {
+                                            Modifier
+                                        },
+                                    ),
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Number,
+                                    imeAction = ImeAction.Next,
+                                ),
+                                keyboardActions = KeyboardActions(
+                                    onNext = { focusManager.moveFocus(FocusDirection.Next) },
+                                ),
+                                singleLine = true,
+                                enabled = !exercise.skipped,
+                            )
+                            OutlinedTextField(
+                                value = exercise.loadInput,
+                                onValueChange = { onUpdateLoad(exercise.exerciseSessionId, it) },
+                                label = { Text("Load (${exercise.loadUnit.name.lowercase()})") },
+                                placeholder = {
+                                    if (exercise.suggestedLoadText.isNotEmpty()) {
+                                        Text(exercise.suggestedLoadText)
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Decimal,
+                                    imeAction = ImeAction.Next,
+                                ),
+                                keyboardActions = KeyboardActions(
+                                    onNext = { focusManager.moveFocus(FocusDirection.Next) },
+                                ),
+                                singleLine = true,
+                                enabled = !exercise.skipped,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
