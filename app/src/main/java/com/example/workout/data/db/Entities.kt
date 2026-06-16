@@ -1,4 +1,4 @@
-package com.example.workout.data.db
+package dev.wwade.workout.data.db
 
 import androidx.room.Embedded
 import androidx.room.Entity
@@ -6,9 +6,9 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import androidx.room.Relation
-import com.example.workout.domain.model.LoadKind
-import com.example.workout.domain.model.LoadUnit
-import com.example.workout.domain.model.SessionStatus
+import dev.wwade.workout.domain.model.LoadKind
+import dev.wwade.workout.domain.model.LoadUnit
+import dev.wwade.workout.domain.model.SessionStatus
 
 @Entity(tableName = "workout_templates")
 data class WorkoutTemplateEntity(

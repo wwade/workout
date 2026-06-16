@@ -31,6 +31,7 @@ From Android Studio:
 - Run app
 - Run unit tests
 - Run instrumentation tests
+- Prefer the `e2e` build variant for device-backed integration runs
 
 From a terminal, once Gradle is available:
 
@@ -38,6 +39,8 @@ From a terminal, once Gradle is available:
 ./gradlew test
 ./gradlew connectedAndroidTest
 ./gradlew assembleDebug
+./gradlew assembleE2e
+./gradlew connectedE2eAndroidTest
 ```
 
 On Windows with the wrapper present:
@@ -46,17 +49,27 @@ On Windows with the wrapper present:
 .\gradlew.bat test
 .\gradlew.bat connectedAndroidTest
 .\gradlew.bat assembleDebug
+.\gradlew.bat assembleE2e
+.\gradlew.bat connectedE2eAndroidTest
 ```
+
+Build identities:
+
+- `release`: `dev.wwade.workout`
+- `debug`: `dev.wwade.workout.debug`
+- `e2e`: `dev.wwade.workout.e2e`
+
+Use `connectedE2eAndroidTest` when you want instrumentation tests to run against the dedicated `e2e` app install instead of the regular debug install.
 
 ## Architecture
 
 The project is intentionally simple for the MVP:
 
-- `app/src/main/java/com/example/workout/data`
+- `app/src/main/java/dev/wwade/workout/data`
   - Room entities, DAOs, database, repository implementations
-- `app/src/main/java/com/example/workout/domain`
+- `app/src/main/java/dev/wwade/workout/domain`
   - domain models, repository interfaces, validation, use cases
-- `app/src/main/java/com/example/workout/ui`
+- `app/src/main/java/dev/wwade/workout/ui`
   - Compose screens, navigation, viewmodels, UI state
 
 Important entry points:

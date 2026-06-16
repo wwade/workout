@@ -1,10 +1,10 @@
-package com.example.workout.domain.usecase
+package dev.wwade.workout.domain.usecase
 
-import com.example.workout.domain.model.CircuitDraft
-import com.example.workout.domain.model.ExerciseDraft
-import com.example.workout.domain.model.LoadKind
-import com.example.workout.domain.model.LoadUnit
-import com.example.workout.domain.model.WorkoutDraft
+import dev.wwade.workout.domain.model.CircuitDraft
+import dev.wwade.workout.domain.model.ExerciseDraft
+import dev.wwade.workout.domain.model.LoadKind
+import dev.wwade.workout.domain.model.LoadUnit
+import dev.wwade.workout.domain.model.WorkoutDraft
 
 data class WorkoutValidationResult(
     val workoutNameError: String? = null,

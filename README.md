@@ -66,10 +66,12 @@ The app uses a single `app` module and is split into three main layers:
 3. Run `./gradlew testDebugUnitTest` or let Android Studio sync the project.
 4. Run the `app` configuration on an emulator or Android device.
 
+For device-backed integration runs, prefer the dedicated `e2e` build so tests do not touch the debug app's data. Use `./gradlew connectedE2eAndroidTest`.
+
 ## Current Status
 
 This repo contains the MVP scaffold and core flows. The checked-in Gradle wrapper works, the unit-test build passes, and the debug APK assembles successfully.
 
-Instrumentation tests are included, but they require a connected emulator or Android device.
+Instrumentation tests are included, but they require a connected emulator or Android device. The project now includes separate app ids for `debug` and `e2e` builds so device tests can run without colliding with a normal installed app.
 
 See [DEVELOPING.md](DEVELOPING.md) for setup details and implementation notes.

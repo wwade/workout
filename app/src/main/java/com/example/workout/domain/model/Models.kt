@@ -1,4 +1,4 @@
-package com.example.workout.domain.model
+package dev.wwade.workout.domain.model
 
 enum class LoadKind {
     WEIGHT,

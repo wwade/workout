@@ -1,10 +1,10 @@
-package com.example.workout.data.repository
+package dev.wwade.workout.data.repository
 
-import com.example.workout.data.db.WorkoutTemplateDao
-import com.example.workout.domain.model.WorkoutDraft
-import com.example.workout.domain.model.WorkoutListItem
-import com.example.workout.domain.model.WorkoutTemplate
-import com.example.workout.domain.repository.WorkoutRepository
+import dev.wwade.workout.data.db.WorkoutTemplateDao
+import dev.wwade.workout.domain.model.WorkoutDraft
+import dev.wwade.workout.domain.model.WorkoutListItem
+import dev.wwade.workout.domain.model.WorkoutTemplate
+import dev.wwade.workout.domain.repository.WorkoutRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 

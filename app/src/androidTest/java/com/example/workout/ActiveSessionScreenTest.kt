@@ -1,4 +1,4 @@
-package com.example.workout
+package dev.wwade.workout
 
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
@@ -14,10 +14,10 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performImeAction
-import com.example.workout.domain.model.LoadUnit
-import com.example.workout.ui.screen.ActiveSessionScreen
-import com.example.workout.ui.state.ActiveExerciseCardState
-import com.example.workout.ui.state.ActiveSessionState
+import dev.wwade.workout.domain.model.LoadUnit
+import dev.wwade.workout.ui.screen.ActiveSessionScreen
+import dev.wwade.workout.ui.state.ActiveExerciseCardState
+import dev.wwade.workout.ui.state.ActiveSessionState
 import org.junit.Rule
 import org.junit.Test
 
@@ -181,9 +181,9 @@ class ActiveSessionScreenTest {
             activeSessionState(currentSetIndex = 1).copy(
                 currentCircuitName = "Cycle 2",
                 positionOptions = listOf(
-                    com.example.workout.ui.state.SessionPositionOptionState(0, 0, "Cycle 1 - Set 1", "Saved", true),
-                    com.example.workout.ui.state.SessionPositionOptionState(0, 1, "Cycle 2 - Set 1", "Current", true),
-                    com.example.workout.ui.state.SessionPositionOptionState(0, 2, "Cycle 2 - Set 2", "Upcoming", false),
+                    dev.wwade.workout.ui.state.SessionPositionOptionState(0, 0, "Cycle 1 - Set 1", "Saved", true),
+                    dev.wwade.workout.ui.state.SessionPositionOptionState(0, 1, "Cycle 2 - Set 1", "Current", true),
+                    dev.wwade.workout.ui.state.SessionPositionOptionState(0, 2, "Cycle 2 - Set 2", "Upcoming", false),
                 ),
                 exerciseCards = listOf(
                     exerciseCard(
@@ -238,9 +238,9 @@ class ActiveSessionScreenTest {
             canGoBack = currentSetIndex > 0,
             canGoForward = currentSetIndex < 2,
             positionOptions = listOf(
-                com.example.workout.ui.state.SessionPositionOptionState(0, 0, "Warmup - Set 1", "Saved", true),
-                com.example.workout.ui.state.SessionPositionOptionState(0, 1, "Warmup - Set 2", "Current", true),
-                com.example.workout.ui.state.SessionPositionOptionState(0, 2, "Warmup - Set 3", "Upcoming", false),
+                dev.wwade.workout.ui.state.SessionPositionOptionState(0, 0, "Warmup - Set 1", "Saved", true),
+                dev.wwade.workout.ui.state.SessionPositionOptionState(0, 1, "Warmup - Set 2", "Current", true),
+                dev.wwade.workout.ui.state.SessionPositionOptionState(0, 2, "Warmup - Set 3", "Upcoming", false),
             ),
             exerciseCards = (1..exerciseCount).map { index ->
                 exerciseCard(

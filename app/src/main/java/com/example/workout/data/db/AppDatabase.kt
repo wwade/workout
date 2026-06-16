@@ -1,4 +1,4 @@
-package com.example.workout.data.db
+package dev.wwade.workout.data.db
 
 import androidx.room.Database
 import androidx.room.RoomDatabase

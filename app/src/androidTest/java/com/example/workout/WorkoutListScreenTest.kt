@@ -1,11 +1,11 @@
-package com.example.workout
+package dev.wwade.workout
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import com.example.workout.ui.screen.WorkoutListScreen
-import com.example.workout.ui.state.WorkoutListState
+import dev.wwade.workout.ui.screen.WorkoutListScreen
+import dev.wwade.workout.ui.state.WorkoutListState
 import org.junit.Rule
 import org.junit.Test
 

@@ -1,4 +1,4 @@
-package com.example.workout.ui.viewmodel
+package dev.wwade.workout.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider

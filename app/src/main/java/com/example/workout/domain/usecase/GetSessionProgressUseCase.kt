@@ -1,11 +1,11 @@
-package com.example.workout.domain.usecase
+package dev.wwade.workout.domain.usecase
 
-import com.example.workout.domain.model.ExerciseProgressSnapshot
-import com.example.workout.domain.model.SessionPositionSnapshot
-import com.example.workout.domain.model.SetEntry
-import com.example.workout.domain.model.SessionProgressSnapshot
-import com.example.workout.domain.model.WorkoutSessionDetail
-import com.example.workout.domain.repository.SessionRepository
+import dev.wwade.workout.domain.model.ExerciseProgressSnapshot
+import dev.wwade.workout.domain.model.SessionPositionSnapshot
+import dev.wwade.workout.domain.model.SetEntry
+import dev.wwade.workout.domain.model.SessionProgressSnapshot
+import dev.wwade.workout.domain.model.WorkoutSessionDetail
+import dev.wwade.workout.domain.repository.SessionRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 

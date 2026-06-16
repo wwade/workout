@@ -1,13 +1,13 @@
-package com.example.workout
+package dev.wwade.workout
 
 import android.app.Application
 import androidx.room.Room
-import com.example.workout.data.db.AppDatabase
-import com.example.workout.domain.model.DefaultWorkoutDrafts
-import com.example.workout.data.repository.RoomSessionRepository
-import com.example.workout.data.repository.RoomWorkoutRepository
-import com.example.workout.domain.repository.SessionRepository
-import com.example.workout.domain.repository.WorkoutRepository
+import dev.wwade.workout.data.db.AppDatabase
+import dev.wwade.workout.domain.model.DefaultWorkoutDrafts
+import dev.wwade.workout.data.repository.RoomSessionRepository
+import dev.wwade.workout.data.repository.RoomWorkoutRepository
+import dev.wwade.workout.domain.repository.SessionRepository
+import dev.wwade.workout.domain.repository.WorkoutRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

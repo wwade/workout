@@ -1,13 +1,13 @@
-package com.example.workout
+package dev.wwade.workout
 
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.example.workout.data.db.AppDatabase
-import com.example.workout.domain.model.CircuitDraft
-import com.example.workout.domain.model.ExerciseDraft
-import com.example.workout.domain.model.WorkoutDraft
+import dev.wwade.workout.data.db.AppDatabase
+import dev.wwade.workout.domain.model.CircuitDraft
+import dev.wwade.workout.domain.model.ExerciseDraft
+import dev.wwade.workout.domain.model.WorkoutDraft
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.runBlocking
 import org.junit.After

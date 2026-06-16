@@ -1,4 +1,4 @@
-package com.example.workout.data.db
+package dev.wwade.workout.data.db
 
 import androidx.room.Dao
 import androidx.room.Delete
@@ -7,9 +7,9 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
-import com.example.workout.domain.model.CircuitDraft
-import com.example.workout.domain.model.ExerciseDraft
-import com.example.workout.domain.model.WorkoutDraft
+import dev.wwade.workout.domain.model.CircuitDraft
+import dev.wwade.workout.domain.model.ExerciseDraft
+import dev.wwade.workout.domain.model.WorkoutDraft
 import kotlinx.coroutines.flow.Flow
 
 @Dao

@@ -1,8 +1,8 @@
-package com.example.workout.domain.repository
+package dev.wwade.workout.domain.repository
 
-import com.example.workout.domain.model.WorkoutDraft
-import com.example.workout.domain.model.WorkoutListItem
-import com.example.workout.domain.model.WorkoutTemplate
+import dev.wwade.workout.domain.model.WorkoutDraft
+import dev.wwade.workout.domain.model.WorkoutListItem
+import dev.wwade.workout.domain.model.WorkoutTemplate
 import kotlinx.coroutines.flow.Flow
 
 interface WorkoutRepository {

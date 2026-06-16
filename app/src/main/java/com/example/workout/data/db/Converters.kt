@@ -1,9 +1,9 @@
-package com.example.workout.data.db
+package dev.wwade.workout.data.db
 
 import androidx.room.TypeConverter
-import com.example.workout.domain.model.LoadKind
-import com.example.workout.domain.model.LoadUnit
-import com.example.workout.domain.model.SessionStatus
+import dev.wwade.workout.domain.model.LoadKind
+import dev.wwade.workout.domain.model.LoadUnit
+import dev.wwade.workout.domain.model.SessionStatus
 
 class Converters {
     @TypeConverter

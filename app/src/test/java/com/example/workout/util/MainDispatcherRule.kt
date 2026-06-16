@@ -1,4 +1,4 @@
-package com.example.workout.util
+package dev.wwade.workout.util
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi

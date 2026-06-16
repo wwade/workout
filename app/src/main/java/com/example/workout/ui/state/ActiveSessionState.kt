@@ -1,6 +1,6 @@
-package com.example.workout.ui.state
+package dev.wwade.workout.ui.state
 
-import com.example.workout.domain.model.LoadUnit
+import dev.wwade.workout.domain.model.LoadUnit
 
 data class ActiveSessionState(
     val sessionId: Long = 0,

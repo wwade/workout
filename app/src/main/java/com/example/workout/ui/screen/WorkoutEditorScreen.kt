@@ -1,4 +1,4 @@
-package com.example.workout.ui.screen
+package dev.wwade.workout.ui.screen
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -37,11 +37,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
-import com.example.workout.domain.model.CircuitDraft
-import com.example.workout.domain.model.ExerciseDraft
-import com.example.workout.domain.model.LoadKind
-import com.example.workout.domain.model.LoadUnit
-import com.example.workout.ui.state.WorkoutEditorState
+import dev.wwade.workout.domain.model.CircuitDraft
+import dev.wwade.workout.domain.model.ExerciseDraft
+import dev.wwade.workout.domain.model.LoadKind
+import dev.wwade.workout.domain.model.LoadUnit
+import dev.wwade.workout.ui.state.WorkoutEditorState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -230,7 +230,7 @@ private fun ExerciseRow(
     circuitIndex: Int,
     exerciseIndex: Int,
     exercise: ExerciseDraft,
-    validation: com.example.workout.domain.usecase.ExerciseValidation?,
+    validation: dev.wwade.workout.domain.usecase.ExerciseValidation?,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onMoveUp: () -> Unit,

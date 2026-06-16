@@ -1,15 +1,15 @@
-package com.example.workout.ui.viewmodel
+package dev.wwade.workout.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.workout.BuildConfig
-import com.example.workout.domain.model.CircuitDraft
-import com.example.workout.domain.model.DefaultWorkoutDrafts
-import com.example.workout.domain.model.ExerciseDraft
-import com.example.workout.domain.model.WorkoutDraft
-import com.example.workout.domain.repository.WorkoutRepository
-import com.example.workout.domain.usecase.ValidateWorkoutDraftUseCase
-import com.example.workout.ui.state.WorkoutEditorState
+import dev.wwade.workout.BuildConfig
+import dev.wwade.workout.domain.model.CircuitDraft
+import dev.wwade.workout.domain.model.DefaultWorkoutDrafts
+import dev.wwade.workout.domain.model.ExerciseDraft
+import dev.wwade.workout.domain.model.WorkoutDraft
+import dev.wwade.workout.domain.repository.WorkoutRepository
+import dev.wwade.workout.domain.usecase.ValidateWorkoutDraftUseCase
+import dev.wwade.workout.ui.state.WorkoutEditorState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

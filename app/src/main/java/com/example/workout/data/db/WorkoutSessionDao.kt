@@ -1,4 +1,4 @@
-package com.example.workout.data.db
+package dev.wwade.workout.data.db
 
 import androidx.room.Dao
 import androidx.room.Insert
@@ -6,7 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
-import com.example.workout.domain.model.SessionStatus
+import dev.wwade.workout.domain.model.SessionStatus
 import kotlinx.coroutines.flow.Flow
 
 @Dao

@@ -1,14 +1,14 @@
-package com.example.workout.ui.viewmodel
+package dev.wwade.workout.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.workout.domain.model.ExerciseProgressSnapshot
-import com.example.workout.domain.model.SetEntryDraft
-import com.example.workout.domain.repository.SessionRepository
-import com.example.workout.domain.usecase.SessionProgressCalculator
-import com.example.workout.ui.state.ActiveExerciseCardState
-import com.example.workout.ui.state.ActiveSessionState
-import com.example.workout.ui.state.SessionPositionOptionState
+import dev.wwade.workout.domain.model.ExerciseProgressSnapshot
+import dev.wwade.workout.domain.model.SetEntryDraft
+import dev.wwade.workout.domain.repository.SessionRepository
+import dev.wwade.workout.domain.usecase.SessionProgressCalculator
+import dev.wwade.workout.ui.state.ActiveExerciseCardState
+import dev.wwade.workout.ui.state.ActiveSessionState
+import dev.wwade.workout.ui.state.SessionPositionOptionState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow

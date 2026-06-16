@@ -1,4 +1,4 @@
-package com.example.workout.ui.screen
+package dev.wwade.workout.ui.screen
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -28,8 +28,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.workout.domain.model.WorkoutListItem
-import com.example.workout.ui.state.WorkoutListState
+import dev.wwade.workout.domain.model.WorkoutListItem
+import dev.wwade.workout.ui.state.WorkoutListState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

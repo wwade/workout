@@ -1,15 +1,15 @@
-package com.example.workout.data.repository
+package dev.wwade.workout.data.repository
 
-import com.example.workout.data.db.SetEntryEntity
-import com.example.workout.data.db.WorkoutSessionDao
-import com.example.workout.data.db.WorkoutTemplateDao
-import com.example.workout.domain.model.CompletedSessionListItem
-import com.example.workout.domain.model.SetEntry
-import com.example.workout.domain.model.SetEntryDraft
-import com.example.workout.domain.model.SessionStatus
-import com.example.workout.domain.model.WorkoutSessionDetail
-import com.example.workout.domain.repository.SessionRepository
-import com.example.workout.domain.usecase.SessionProgressCalculator
+import dev.wwade.workout.data.db.SetEntryEntity
+import dev.wwade.workout.data.db.WorkoutSessionDao
+import dev.wwade.workout.data.db.WorkoutTemplateDao
+import dev.wwade.workout.domain.model.CompletedSessionListItem
+import dev.wwade.workout.domain.model.SetEntry
+import dev.wwade.workout.domain.model.SetEntryDraft
+import dev.wwade.workout.domain.model.SessionStatus
+import dev.wwade.workout.domain.model.WorkoutSessionDetail
+import dev.wwade.workout.domain.repository.SessionRepository
+import dev.wwade.workout.domain.usecase.SessionProgressCalculator
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 

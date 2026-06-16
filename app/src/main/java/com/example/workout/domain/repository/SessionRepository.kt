@@ -1,9 +1,9 @@
-package com.example.workout.domain.repository
+package dev.wwade.workout.domain.repository
 
-import com.example.workout.domain.model.CompletedSessionListItem
-import com.example.workout.domain.model.SetEntry
-import com.example.workout.domain.model.SetEntryDraft
-import com.example.workout.domain.model.WorkoutSessionDetail
+import dev.wwade.workout.domain.model.CompletedSessionListItem
+import dev.wwade.workout.domain.model.SetEntry
+import dev.wwade.workout.domain.model.SetEntryDraft
+import dev.wwade.workout.domain.model.WorkoutSessionDetail
 import kotlinx.coroutines.flow.Flow
 
 interface SessionRepository {

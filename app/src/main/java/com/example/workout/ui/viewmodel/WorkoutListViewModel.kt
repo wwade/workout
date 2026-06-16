@@ -1,12 +1,12 @@
-package com.example.workout.ui.viewmodel
+package dev.wwade.workout.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.workout.domain.model.WorkoutListItem
-import com.example.workout.domain.repository.SessionRepository
-import com.example.workout.domain.repository.WorkoutRepository
-import com.example.workout.domain.usecase.StartWorkoutUseCase
-import com.example.workout.ui.state.WorkoutListState
+import dev.wwade.workout.domain.model.WorkoutListItem
+import dev.wwade.workout.domain.repository.SessionRepository
+import dev.wwade.workout.domain.repository.WorkoutRepository
+import dev.wwade.workout.domain.usecase.StartWorkoutUseCase
+import dev.wwade.workout.ui.state.WorkoutListState
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine

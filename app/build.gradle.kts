@@ -6,11 +6,12 @@ plugins {
 }
 
 android {
-    namespace = "com.example.workout"
-    compileSdk = 35
+    namespace = "dev.wwade.workout"
+    compileSdk = 37
+    testBuildType = "e2e"
 
     defaultConfig {
-        applicationId = "com.example.workout"
+        applicationId = "dev.wwade.workout"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
@@ -23,6 +24,16 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+        }
+
+        create("e2e") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".e2e"
+            matchingFallbacks += listOf("debug")
+        }
+
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -93,4 +104,6 @@ dependencies {
 
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+    add("e2eImplementation", libs.androidx.compose.ui.tooling)
+    add("e2eImplementation", libs.androidx.compose.ui.test.manifest)
 }

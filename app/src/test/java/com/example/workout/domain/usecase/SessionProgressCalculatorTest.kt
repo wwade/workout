@@ -1,12 +1,12 @@
-package com.example.workout.domain.usecase
+package dev.wwade.workout.domain.usecase
 
-import com.example.workout.domain.model.CircuitSessionDetail
-import com.example.workout.domain.model.ExerciseSessionDetail
-import com.example.workout.domain.model.LoadKind
-import com.example.workout.domain.model.LoadUnit
-import com.example.workout.domain.model.SessionStatus
-import com.example.workout.domain.model.SetEntry
-import com.example.workout.domain.model.WorkoutSessionDetail
+import dev.wwade.workout.domain.model.CircuitSessionDetail
+import dev.wwade.workout.domain.model.ExerciseSessionDetail
+import dev.wwade.workout.domain.model.LoadKind
+import dev.wwade.workout.domain.model.LoadUnit
+import dev.wwade.workout.domain.model.SessionStatus
+import dev.wwade.workout.domain.model.SetEntry
+import dev.wwade.workout.domain.model.WorkoutSessionDetail
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
 import org.junit.Test

@@ -1,4 +1,4 @@
-package com.example.workout.ui.navigation
+package dev.wwade.workout.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -11,18 +11,18 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.workout.AppContainer
-import com.example.workout.ui.screen.ActiveSessionScreen
-import com.example.workout.ui.screen.HistoryScreen
-import com.example.workout.ui.screen.SessionSummaryScreen
-import com.example.workout.ui.screen.WorkoutEditorScreen
-import com.example.workout.ui.screen.WorkoutListScreen
-import com.example.workout.ui.viewmodel.ActiveSessionViewModel
-import com.example.workout.ui.viewmodel.AppViewModelFactory
-import com.example.workout.ui.viewmodel.HistoryViewModel
-import com.example.workout.ui.viewmodel.SessionSummaryViewModel
-import com.example.workout.ui.viewmodel.WorkoutEditorViewModel
-import com.example.workout.ui.viewmodel.WorkoutListViewModel
+import dev.wwade.workout.AppContainer
+import dev.wwade.workout.ui.screen.ActiveSessionScreen
+import dev.wwade.workout.ui.screen.HistoryScreen
+import dev.wwade.workout.ui.screen.SessionSummaryScreen
+import dev.wwade.workout.ui.screen.WorkoutEditorScreen
+import dev.wwade.workout.ui.screen.WorkoutListScreen
+import dev.wwade.workout.ui.viewmodel.ActiveSessionViewModel
+import dev.wwade.workout.ui.viewmodel.AppViewModelFactory
+import dev.wwade.workout.ui.viewmodel.HistoryViewModel
+import dev.wwade.workout.ui.viewmodel.SessionSummaryViewModel
+import dev.wwade.workout.ui.viewmodel.WorkoutEditorViewModel
+import dev.wwade.workout.ui.viewmodel.WorkoutListViewModel
 import kotlinx.coroutines.launch
 
 @Composable

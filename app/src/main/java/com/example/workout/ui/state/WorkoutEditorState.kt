@@ -1,7 +1,7 @@
-package com.example.workout.ui.state
+package dev.wwade.workout.ui.state
 
-import com.example.workout.domain.model.WorkoutDraft
-import com.example.workout.domain.usecase.WorkoutValidationResult
+import dev.wwade.workout.domain.model.WorkoutDraft
+import dev.wwade.workout.domain.usecase.WorkoutValidationResult
 
 data class WorkoutEditorState(
     val draft: WorkoutDraft = WorkoutDraft(),

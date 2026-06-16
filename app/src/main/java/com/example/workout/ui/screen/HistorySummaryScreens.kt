@@ -1,4 +1,4 @@
-package com.example.workout.ui.screen
+package dev.wwade.workout.ui.screen
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,8 +17,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.workout.ui.state.HistoryState
-import com.example.workout.ui.state.SessionSummaryState
+import dev.wwade.workout.ui.state.HistoryState
+import dev.wwade.workout.ui.state.SessionSummaryState
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter

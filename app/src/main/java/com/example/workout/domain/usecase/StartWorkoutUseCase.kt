@@ -1,6 +1,6 @@
-package com.example.workout.domain.usecase
+package dev.wwade.workout.domain.usecase
 
-import com.example.workout.domain.repository.SessionRepository
+import dev.wwade.workout.domain.repository.SessionRepository
 
 class StartWorkoutUseCase(
     private val sessionRepository: SessionRepository,

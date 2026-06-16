@@ -1,9 +1,9 @@
-package com.example.workout.ui.viewmodel
+package dev.wwade.workout.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.workout.domain.repository.SessionRepository
-import com.example.workout.ui.state.HistoryState
+import dev.wwade.workout.domain.repository.SessionRepository
+import dev.wwade.workout.ui.state.HistoryState
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
