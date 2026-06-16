@@ -24,6 +24,14 @@ class WorkoutListScreenTest {
                 onStartWorkout = {},
                 onResumeWorkout = {},
                 onOpenHistory = {},
+                onShowImportOptions = {},
+                onHideImportDialog = {},
+                onShowUrlImport = {},
+                onUpdateImportUrl = {},
+                onImportFromUrl = {},
+                onImportFromJson = {},
+                onImportFileReadFailed = {},
+                onDismissImportMessage = {},
             )
         }
 
