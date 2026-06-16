@@ -59,6 +59,14 @@ fun WorkoutNavHost(
                 },
                 onResumeWorkout = { sessionId -> navController.navigate("session/$sessionId") },
                 onOpenHistory = { navController.navigate("history") },
+                onShowImportOptions = viewModel::showImportOptions,
+                onHideImportDialog = viewModel::hideImportDialog,
+                onShowUrlImport = viewModel::showUrlImport,
+                onUpdateImportUrl = viewModel::updateImportUrl,
+                onImportFromUrl = viewModel::importFromUrl,
+                onImportFromJson = viewModel::importFromJson,
+                onImportFileReadFailed = viewModel::showImportError,
+                onDismissImportMessage = viewModel::clearImportMessage,
             )
         }
 

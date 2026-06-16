@@ -19,6 +19,49 @@ The app is built around two modes:
 - Resume an in-progress workout
 - Save completed workout history
 - Prefill set inputs from the latest completed session for the same exercise and set index
+- Import workout templates from a local JSON file or direct JSON URL
+
+## Importing Workouts
+
+Use the Import action on the workout list screen to import workout templates from either:
+
+- a local JSON file selected through Android's document picker
+- a direct-download URL that returns JSON
+
+Imports are template-only. They do not import session history or active workouts, and they never overwrite existing templates. If an imported workout has the same name as an existing workout, the app creates another copy with the imported name.
+
+The supported JSON shape is:
+
+```json
+{
+  "workouts": [
+    {
+      "name": "Push Day",
+      "circuits": [
+        {
+          "name": "Cycle 1",
+          "exercises": [
+            {
+              "name": "Dumbbell Press",
+              "guidance": "Use controlled reps.",
+              "repMin": 6,
+              "repMax": 8,
+              "loadKind": "WEIGHT",
+              "loadMin": 20.0,
+              "loadMax": 40.0,
+              "loadUnit": "LB",
+              "restTimeSeconds": 60,
+              "setCount": 3
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+A single workout object with `name` and `circuits` is also accepted as a convenience. Import validation uses the same rules as the workout editor.
 
 ## Data Model
 
@@ -46,6 +89,7 @@ Performed sets include:
 
 - Kotlin
 - Jetpack Compose
+- Kotlin serialization
 - Room
 - Navigation Compose
 - ViewModel

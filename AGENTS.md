@@ -38,9 +38,19 @@ To capture logs for inspection:
 .\gradlew.bat connectedE2eAndroidTest --warning-mode all *> gradle-e2e-test.log
 ```
 
+## Import Feature Notes
+
+- The app imports workout templates from local JSON files or direct JSON URLs.
+- Import code lives under `domain/importer`; keep import DTOs separate from Room entities and domain models.
+- Imports are append-only: do not overwrite, merge, or skip matching workout names unless the product behavior is intentionally changed.
+- Local file import uses Android's document picker and `ContentResolver`.
+- URL import requires `android.permission.INTERNET` and currently expects unauthenticated direct JSON responses.
+- Update README and DEVELOPING when changing the import JSON schema or duplicate-handling behavior.
+
 ## Notes
 
 - If Gradle fails with `JAVA_HOME is not set`, use the setup above before retrying.
 - First-time wrapper or dependency downloads may require network access.
+- If the project-local Gradle cache has a Windows file lock, use a second project-local cache such as `.gradle-user-import` and keep it ignored.
 - Gradle can emit structured warnings into `build/reports/problems/problems-report.html` even when stdout is quiet.
 - Package ids by build type are `dev.wwade.workout` for release, `dev.wwade.workout.debug` for debug, and `dev.wwade.workout.e2e` for device-backed test runs.

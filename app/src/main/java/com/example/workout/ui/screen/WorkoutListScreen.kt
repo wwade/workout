@@ -1,7 +1,10 @@
 package dev.wwade.workout.ui.screen
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,14 +15,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -27,8 +35,10 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import dev.wwade.workout.domain.model.WorkoutListItem
+import dev.wwade.workout.ui.state.WorkoutImportDialog
 import dev.wwade.workout.ui.state.WorkoutListState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,12 +51,43 @@ fun WorkoutListScreen(
     onStartWorkout: (Long) -> Unit,
     onResumeWorkout: (Long) -> Unit,
     onOpenHistory: () -> Unit,
+    onShowImportOptions: () -> Unit,
+    onHideImportDialog: () -> Unit,
+    onShowUrlImport: () -> Unit,
+    onUpdateImportUrl: (String) -> Unit,
+    onImportFromUrl: () -> Unit,
+    onImportFromJson: (String) -> Unit,
+    onImportFileReadFailed: (String) -> Unit,
+    onDismissImportMessage: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val importFileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+
+        val json = runCatching {
+            context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+        }.getOrNull()
+
+        if (json.isNullOrBlank()) {
+            onImportFileReadFailed("Unable to read the selected JSON file.")
+        } else {
+            onImportFromJson(json)
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Workout Tracker") },
                 actions = {
+                    IconButton(
+                        onClick = onShowImportOptions,
+                        enabled = !state.isImporting,
+                    ) {
+                        Icon(Icons.Default.FileUpload, contentDescription = "Import workouts")
+                    }
                     IconButton(onClick = onOpenHistory) {
                         Icon(Icons.Default.History, contentDescription = "History")
                     }
@@ -59,11 +100,121 @@ fun WorkoutListScreen(
             }
         },
     ) { padding ->
+        WorkoutListContent(
+            state = state,
+            padding = padding,
+            onEditWorkout = onEditWorkout,
+            onDeleteWorkout = onDeleteWorkout,
+            onStartWorkout = onStartWorkout,
+            onResumeWorkout = onResumeWorkout,
+            onDismissImportMessage = onDismissImportMessage,
+        )
+    }
+
+    when (state.importDialog) {
+        WorkoutImportDialog.None -> Unit
+        WorkoutImportDialog.ChooseSource -> {
+            AlertDialog(
+                onDismissRequest = onHideImportDialog,
+                title = { Text("Import workouts") },
+                text = { Text("Choose a JSON source to import workout templates.") },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            onHideImportDialog()
+                            importFileLauncher.launch(arrayOf("application/json", "text/*"))
+                        },
+                    ) {
+                        Text("Local file")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = onShowUrlImport) {
+                        Text("URL")
+                    }
+                },
+            )
+        }
+
+        WorkoutImportDialog.UrlInput -> {
+            AlertDialog(
+                onDismissRequest = onHideImportDialog,
+                title = { Text("Import from URL") },
+                text = {
+                    OutlinedTextField(
+                        value = state.importUrl,
+                        onValueChange = onUpdateImportUrl,
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Direct JSON URL") },
+                        singleLine = true,
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = onImportFromUrl,
+                        enabled = !state.isImporting,
+                    ) {
+                        Text("Import")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = onHideImportDialog) {
+                        Text("Cancel")
+                    }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun WorkoutListContent(
+    state: WorkoutListState,
+    padding: PaddingValues,
+    onEditWorkout: (Long) -> Unit,
+    onDeleteWorkout: (WorkoutListItem) -> Unit,
+    onStartWorkout: (Long) -> Unit,
+    onResumeWorkout: (Long) -> Unit,
+    onDismissImportMessage: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(padding),
+    ) {
+        if (state.isImporting) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+
+        state.importMessage?.let { message ->
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = message.text,
+                        color = if (message.isError) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                    )
+                    TextButton(onClick = onDismissImportMessage) {
+                        Text("Dismiss")
+                    }
+                }
+            }
+        }
+
         if (state.workouts.isEmpty()) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding)
                     .padding(24.dp),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -80,8 +231,7 @@ fun WorkoutListScreen(
         } else {
             LazyColumn(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
+                    .fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 items(state.workouts, key = { it.id }) { workout ->

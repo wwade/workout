@@ -68,7 +68,7 @@ The project is intentionally simple for the MVP:
 - `app/src/main/java/dev/wwade/workout/data`
   - Room entities, DAOs, database, repository implementations
 - `app/src/main/java/dev/wwade/workout/domain`
-  - domain models, repository interfaces, validation, use cases
+  - domain models, repository interfaces, validation, import parsing, use cases
 - `app/src/main/java/dev/wwade/workout/ui`
   - Compose screens, navigation, viewmodels, UI state
 
@@ -84,8 +84,22 @@ Important entry points:
 - A circuit must contain at least one exercise.
 - Every exercise must have at least one set.
 - All exercises in the same circuit must use the same set count.
+- Imported workout templates use the same validation rules as editor-created templates.
+- Imports append new templates and do not overwrite, merge, or skip duplicate names.
 - Session execution is round-based and interleaved inside each circuit.
 - Completed sessions are stored as snapshots so history is preserved even if templates change later.
+
+## Import Notes
+
+Workout template import is implemented as a domain-level importer plus a workout-list UI flow:
+
+- `ImportWorkoutsUseCase` coordinates fetching/parsing, validation, and saving.
+- `WorkoutImportParser` accepts either `{"workouts":[...]}` or one single workout object.
+- URL imports use `HttpURLConnection` and require `android.permission.INTERNET`.
+- Local file imports use `ActivityResultContracts.OpenDocument` and read the selected `Uri` once through `ContentResolver`.
+- JSON DTOs are intentionally separate from Room entities and domain models.
+
+The v1 import schema maps directly to `WorkoutDraft`, `CircuitDraft`, and `ExerciseDraft`. Required structural fields are workout `circuits` and circuit `exercises`; exercise fields otherwise fall back to the same defaults as `ExerciseDraft` where possible.
 
 ## Persistence Notes
 
@@ -93,12 +107,15 @@ Important entry points:
 - Session start creates snapshot rows in the session tables.
 - Prefill for active sessions comes from the latest completed session for the same `exerciseTemplateId` and `setIndex`.
 - Only one active session is expected at a time in this MVP.
+- Imports save each valid workout through `WorkoutRepository.saveWorkout` with a new template id.
 
 ## Testing
 
 Current test coverage includes:
 
 - workout validation unit tests
+- workout import parser and import use case unit tests
+- workout list import state unit tests
 - session progression unit tests
 - Room relationship and snapshot instrumentation tests
 - a basic Compose UI instrumentation test for the workout list empty state
@@ -118,4 +135,4 @@ Add tests alongside new behavior when possible:
 
 - improve form UX for editing circuits and exercises
 - add richer session and history tests
-- add import/export or sync planning once the local MVP is stable
+- add export or sync planning once the local MVP is stable
