@@ -8,7 +8,7 @@ plugins {
 
 android {
     namespace = "dev.wwade.workout"
-    compileSdk = 37
+    compileSdk = 36
     defaultConfig {
         applicationId = "dev.wwade.workout"
         minSdk = 26
