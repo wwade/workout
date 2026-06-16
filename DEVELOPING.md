@@ -94,12 +94,12 @@ Important entry points:
 Workout template import is implemented as a domain-level importer plus a workout-list UI flow:
 
 - `ImportWorkoutsUseCase` coordinates fetching/parsing, validation, and saving.
-- `WorkoutImportParser` accepts either `{"workouts":[...]}` or one single workout object.
+- `WorkoutImportParser` accepts JSON or YAML, either as `{"workouts":[...]}` / `workouts: [...]` or one single workout object.
 - URL imports use `HttpURLConnection` and require `android.permission.INTERNET`.
 - Local file imports use `ActivityResultContracts.OpenDocument` and read the selected `Uri` once through `ContentResolver`.
-- JSON DTOs are intentionally separate from Room entities and domain models.
+- Import DTOs are intentionally separate from Room entities and domain models.
 
-The v1 import schema maps directly to `WorkoutDraft`, `CircuitDraft`, and `ExerciseDraft`. Required structural fields are workout `circuits` and circuit `exercises`; exercise fields otherwise fall back to the same defaults as `ExerciseDraft` where possible.
+The v1 import schema maps directly to `WorkoutDraft`, `CircuitDraft`, and `ExerciseDraft`. JSON and YAML use the same field names. Required structural fields are workout `circuits` and circuit `exercises`; exercise fields otherwise fall back to the same defaults as `ExerciseDraft` where possible.
 
 ## Persistence Notes
 

@@ -4,6 +4,7 @@ import dev.wwade.workout.domain.importer.ImportWorkoutsUseCase
 import dev.wwade.workout.domain.importer.WorkoutImportException
 import dev.wwade.workout.domain.importer.WorkoutImportJsonFetcher
 import dev.wwade.workout.domain.importer.validSingleWorkoutJson
+import dev.wwade.workout.domain.importer.validSingleWorkoutYaml
 import dev.wwade.workout.domain.model.CompletedSessionListItem
 import dev.wwade.workout.domain.model.WorkoutDraft
 import dev.wwade.workout.domain.model.WorkoutListItem
@@ -75,6 +76,23 @@ class WorkoutListViewModelTest {
     }
 
     @Test
+    fun importFromYamlShowsSuccessMessage() = runTest {
+        val repository = FakeWorkoutRepository()
+        val viewModel = viewModel(repository)
+        val collector = backgroundScope.launch {
+            viewModel.state.collectLatest { }
+        }
+
+        viewModel.importFromJson(validSingleWorkoutYaml("Yaml Imported"))
+        advanceUntilIdle()
+
+        assertThat(repository.savedWorkouts.map { it.name }).containsExactly("Yaml Imported")
+        assertThat(viewModel.state.value.importMessage?.text).contains("Imported 1 workout")
+        assertThat(viewModel.state.value.importMessage?.isError).isFalse()
+        collector.cancel()
+    }
+
+    @Test
     fun importFromUrlShowsLoadingThenSuccess() = runTest {
         val repository = FakeWorkoutRepository()
         val json = CompletableDeferred<String>()
@@ -108,7 +126,7 @@ class WorkoutListViewModelTest {
             repository = FakeWorkoutRepository(),
             fetcher = object : WorkoutImportJsonFetcher {
                 override suspend fun fetch(url: String): String {
-                    throw WorkoutImportException("Unable to download the workout JSON.")
+                    throw WorkoutImportException("Unable to download the workout file.")
                 }
             },
         )
@@ -120,7 +138,7 @@ class WorkoutListViewModelTest {
         viewModel.importFromUrl()
         advanceUntilIdle()
 
-        assertThat(viewModel.state.value.importMessage?.text).isEqualTo("Unable to download the workout JSON.")
+        assertThat(viewModel.state.value.importMessage?.text).isEqualTo("Unable to download the workout file.")
         assertThat(viewModel.state.value.importMessage?.isError).isTrue()
         collector.cancel()
     }

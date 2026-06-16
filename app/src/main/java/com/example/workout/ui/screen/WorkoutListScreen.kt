@@ -66,14 +66,14 @@ fun WorkoutListScreen(
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
 
-        val json = runCatching {
+        val payload = runCatching {
             context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
         }.getOrNull()
 
-        if (json.isNullOrBlank()) {
-            onImportFileReadFailed("Unable to read the selected JSON file.")
+        if (payload.isNullOrBlank()) {
+            onImportFileReadFailed("Unable to read the selected workout file.")
         } else {
-            onImportFromJson(json)
+            onImportFromJson(payload)
         }
     }
 
@@ -117,12 +117,21 @@ fun WorkoutListScreen(
             AlertDialog(
                 onDismissRequest = onHideImportDialog,
                 title = { Text("Import workouts") },
-                text = { Text("Choose a JSON source to import workout templates.") },
+                text = { Text("Choose a JSON or YAML source to import workout templates.") },
                 confirmButton = {
                     Button(
                         onClick = {
                             onHideImportDialog()
-                            importFileLauncher.launch(arrayOf("application/json", "text/*"))
+                            importFileLauncher.launch(
+                                arrayOf(
+                                    "application/json",
+                                    "application/yaml",
+                                    "application/x-yaml",
+                                    "text/yaml",
+                                    "text/x-yaml",
+                                    "text/*",
+                                ),
+                            )
                         },
                     ) {
                         Text("Local file")
@@ -145,7 +154,7 @@ fun WorkoutListScreen(
                         value = state.importUrl,
                         onValueChange = onUpdateImportUrl,
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Direct JSON URL") },
+                        label = { Text("Direct JSON or YAML URL") },
                         singleLine = true,
                     )
                 },

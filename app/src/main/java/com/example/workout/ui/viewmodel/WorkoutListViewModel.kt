@@ -112,7 +112,7 @@ class WorkoutListViewModel(
             importState.update {
                 it.copy(
                     importMessage = WorkoutImportMessage(
-                        text = "Enter a direct JSON URL to import.",
+                        text = "Enter a direct JSON or YAML URL to import.",
                         isError = true,
                     ),
                 )

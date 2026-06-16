@@ -40,12 +40,12 @@ To capture logs for inspection:
 
 ## Import Feature Notes
 
-- The app imports workout templates from local JSON files or direct JSON URLs.
+- The app imports workout templates from local JSON/YAML files or direct JSON/YAML URLs.
 - Import code lives under `domain/importer`; keep import DTOs separate from Room entities and domain models.
 - Imports are append-only: do not overwrite, merge, or skip matching workout names unless the product behavior is intentionally changed.
 - Local file import uses Android's document picker and `ContentResolver`.
-- URL import requires `android.permission.INTERNET` and currently expects unauthenticated direct JSON responses.
-- Update README and DEVELOPING when changing the import JSON schema or duplicate-handling behavior.
+- URL import requires `android.permission.INTERNET` and currently expects unauthenticated direct JSON or YAML responses.
+- Update README and DEVELOPING when changing the import schema or duplicate-handling behavior.
 
 ## Notes
 

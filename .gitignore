@@ -1,6 +1,7 @@
 .gradle/
 .gradle-user/
 .gradle-user-import/
+.gradle-user-yaml/
 .idea/
 build/
 */build/
