@@ -44,6 +44,10 @@ abstract class WorkoutSessionDao {
     @Query("SELECT * FROM workout_sessions WHERE id = :sessionId")
     abstract suspend fun getSessionDetail(sessionId: Long): WorkoutSessionWithChildren?
 
+    @Transaction
+    @Query("SELECT * FROM workout_sessions ORDER BY startedAt ASC, id ASC")
+    abstract suspend fun getAllSessionDetails(): List<WorkoutSessionWithChildren>
+
     @Query("SELECT * FROM workout_sessions WHERE status = 'COMPLETED' ORDER BY completedAt DESC")
     abstract fun observeCompletedSessions(): Flow<List<WorkoutSessionEntity>>
 

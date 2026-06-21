@@ -101,6 +101,15 @@ Workout template import is implemented as a domain-level importer plus a workout
 
 The v1 import schema maps directly to `WorkoutDraft`, `CircuitDraft`, and `ExerciseDraft`. JSON and YAML use the same field names. Required structural fields are workout `circuits` and circuit `exercises`; exercise fields otherwise fall back to the same defaults as `ExerciseDraft` where possible.
 
+## Export Notes
+
+Full data export is implemented as a separate domain-level exporter plus a workout-list save flow:
+
+- `ExportWorkoutDataUseCase` gathers templates and session history and serializes JSON.
+- Export DTOs live under `domain/exporter` and stay separate from Room entities and domain models.
+- Local export uses `ActivityResultContracts.CreateDocument` and writes the selected `Uri` once through `ContentResolver`.
+- The current export schema is JSON-only and includes templates, sessions, snapshot rows, and set entries.
+
 ## Persistence Notes
 
 - Template definitions and performed sessions are stored in Room.
@@ -135,4 +144,4 @@ Add tests alongside new behavior when possible:
 
 - improve form UX for editing circuits and exercises
 - add richer session and history tests
-- add export or sync planning once the local MVP is stable
+- add import support for full-data restores once the export schema is ready for round-tripping

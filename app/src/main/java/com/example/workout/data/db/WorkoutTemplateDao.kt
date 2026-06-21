@@ -21,6 +21,10 @@ abstract class WorkoutTemplateDao {
     @Query("SELECT * FROM workout_templates WHERE id = :workoutId")
     abstract suspend fun getWorkoutTemplateGraph(workoutId: Long): WorkoutTemplateWithChildren?
 
+    @Transaction
+    @Query("SELECT * FROM workout_templates ORDER BY sortOrder ASC, updatedAt DESC, id ASC")
+    abstract suspend fun getAllWorkoutTemplateGraphs(): List<WorkoutTemplateWithChildren>
+
     @Query("SELECT * FROM workout_templates WHERE id = :workoutId")
     abstract suspend fun getWorkoutTemplateEntity(workoutId: Long): WorkoutTemplateEntity?
 

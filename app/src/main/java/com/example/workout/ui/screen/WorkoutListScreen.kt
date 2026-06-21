@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PlayArrow
@@ -33,6 +34,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -40,6 +46,8 @@ import androidx.compose.ui.unit.dp
 import dev.wwade.workout.domain.model.WorkoutListItem
 import dev.wwade.workout.ui.state.WorkoutImportDialog
 import dev.wwade.workout.ui.state.WorkoutListState
+import dev.wwade.workout.ui.viewmodel.WorkoutExportFile
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,6 +59,10 @@ fun WorkoutListScreen(
     onStartWorkout: (Long) -> Unit,
     onResumeWorkout: (Long) -> Unit,
     onOpenHistory: () -> Unit,
+    onPrepareExport: suspend () -> WorkoutExportFile?,
+    onExportSaved: (String) -> Unit,
+    onExportFailed: (String) -> Unit,
+    onExportCancelled: () -> Unit,
     onShowImportOptions: () -> Unit,
     onHideImportDialog: () -> Unit,
     onShowUrlImport: () -> Unit,
@@ -61,6 +73,8 @@ fun WorkoutListScreen(
     onDismissImportMessage: () -> Unit,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var pendingExport by remember { mutableStateOf<WorkoutExportFile?>(null) }
     val importFileLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri ->
@@ -76,6 +90,27 @@ fun WorkoutListScreen(
             onImportFromJson(payload)
         }
     }
+    val exportFileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        val export = pendingExport
+        pendingExport = null
+
+        if (export == null || uri == null) {
+            onExportCancelled()
+            return@rememberLauncherForActivityResult
+        }
+
+        runCatching {
+            context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { writer ->
+                writer.write(export.content)
+            } ?: error("Unable to open the selected file.")
+        }.onSuccess {
+            onExportSaved(export.fileName)
+        }.onFailure {
+            onExportFailed(it.message ?: "Unable to save the export file.")
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -83,8 +118,20 @@ fun WorkoutListScreen(
                 title = { Text("Workout Tracker") },
                 actions = {
                     IconButton(
+                        onClick = {
+                            scope.launch {
+                                val export = onPrepareExport() ?: return@launch
+                                pendingExport = export
+                                exportFileLauncher.launch(export.fileName)
+                            }
+                        },
+                        enabled = !state.isImporting && !state.isExporting,
+                    ) {
+                        Icon(Icons.Default.FileDownload, contentDescription = "Export data")
+                    }
+                    IconButton(
                         onClick = onShowImportOptions,
-                        enabled = !state.isImporting,
+                        enabled = !state.isImporting && !state.isExporting,
                     ) {
                         Icon(Icons.Default.FileUpload, contentDescription = "Import workouts")
                     }
@@ -195,7 +242,11 @@ private fun WorkoutListContent(
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         }
 
-        state.importMessage?.let { message ->
+        if (state.isExporting) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+
+        state.message?.let { message ->
             Card(
                 modifier = Modifier
                     .fillMaxWidth()

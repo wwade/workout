@@ -3,10 +3,13 @@ package dev.wwade.workout
 import android.app.Application
 import androidx.room.Room
 import dev.wwade.workout.data.db.AppDatabase
-import dev.wwade.workout.domain.model.DefaultWorkoutDrafts
+import dev.wwade.workout.data.repository.RoomWorkoutDataExportRepository
 import dev.wwade.workout.data.repository.RoomSessionRepository
 import dev.wwade.workout.data.repository.RoomWorkoutRepository
+import dev.wwade.workout.domain.exporter.ExportWorkoutDataUseCase
+import dev.wwade.workout.domain.model.DefaultWorkoutDrafts
 import dev.wwade.workout.domain.repository.SessionRepository
+import dev.wwade.workout.domain.repository.WorkoutDataExportRepository
 import dev.wwade.workout.domain.repository.WorkoutRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,6 +29,7 @@ class WorkoutApplication : Application() {
 interface AppContainer {
     val workoutRepository: WorkoutRepository
     val sessionRepository: SessionRepository
+    val exportWorkoutDataUseCase: ExportWorkoutDataUseCase
 }
 
 private class DefaultAppContainer(
@@ -46,6 +50,15 @@ private class DefaultAppContainer(
         workoutTemplateDao = database.workoutTemplateDao(),
         workoutSessionDao = database.workoutSessionDao(),
     )
+
+    private val workoutDataExportRepository: WorkoutDataExportRepository =
+        RoomWorkoutDataExportRepository(
+            workoutTemplateDao = database.workoutTemplateDao(),
+            workoutSessionDao = database.workoutSessionDao(),
+        )
+
+    override val exportWorkoutDataUseCase: ExportWorkoutDataUseCase =
+        ExportWorkoutDataUseCase(workoutDataExportRepository)
 
     init {
         if (BuildConfig.DEBUG) {

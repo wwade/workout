@@ -42,6 +42,7 @@ fun WorkoutNavHost(
                     WorkoutListViewModel(
                         workoutRepository = container.workoutRepository,
                         sessionRepository = container.sessionRepository,
+                        exportWorkoutDataUseCase = container.exportWorkoutDataUseCase,
                     )
                 },
             )
@@ -59,6 +60,10 @@ fun WorkoutNavHost(
                 },
                 onResumeWorkout = { sessionId -> navController.navigate("session/$sessionId") },
                 onOpenHistory = { navController.navigate("history") },
+                onPrepareExport = viewModel::prepareExport,
+                onExportSaved = viewModel::onExportSaved,
+                onExportFailed = viewModel::onExportFailed,
+                onExportCancelled = viewModel::onExportCancelled,
                 onShowImportOptions = viewModel::showImportOptions,
                 onHideImportDialog = viewModel::hideImportDialog,
                 onShowUrlImport = viewModel::showUrlImport,

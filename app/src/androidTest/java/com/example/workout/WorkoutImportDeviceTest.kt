@@ -18,8 +18,11 @@ import com.google.common.truth.Truth.assertThat
 import dev.wwade.workout.data.db.AppDatabase
 import dev.wwade.workout.data.repository.RoomSessionRepository
 import dev.wwade.workout.data.repository.RoomWorkoutRepository
+import dev.wwade.workout.domain.exporter.ExportWorkoutDataUseCase
+import dev.wwade.workout.domain.exporter.WorkoutDataExportSnapshot
 import dev.wwade.workout.domain.importer.ImportWorkoutsUseCase
 import dev.wwade.workout.domain.importer.WorkoutImportJsonFetcher
+import dev.wwade.workout.domain.repository.WorkoutDataExportRepository
 import dev.wwade.workout.ui.screen.WorkoutListScreen
 import dev.wwade.workout.ui.theme.WorkoutTheme
 import dev.wwade.workout.ui.viewmodel.WorkoutListViewModel
@@ -66,6 +69,16 @@ class WorkoutImportDeviceTest {
                 workoutRepository = workoutRepository,
                 jsonFetcher = fetcher,
             ),
+            exportWorkoutDataUseCase = ExportWorkoutDataUseCase(
+                exportRepository = object : WorkoutDataExportRepository {
+                    override suspend fun exportSnapshot(): WorkoutDataExportSnapshot {
+                        return WorkoutDataExportSnapshot(
+                            workouts = emptyList(),
+                            sessions = emptyList(),
+                        )
+                    }
+                },
+            ),
         )
 
         composeRule.setContent {
@@ -79,6 +92,10 @@ class WorkoutImportDeviceTest {
                     onStartWorkout = {},
                     onResumeWorkout = {},
                     onOpenHistory = {},
+                    onPrepareExport = { null },
+                    onExportSaved = {},
+                    onExportFailed = {},
+                    onExportCancelled = {},
                     onShowImportOptions = viewModel::showImportOptions,
                     onHideImportDialog = viewModel::hideImportDialog,
                     onShowUrlImport = viewModel::showUrlImport,

@@ -7,9 +7,10 @@ data class WorkoutListState(
     val workouts: List<WorkoutListItem> = emptyList(),
     val activeSessionId: Long? = null,
     val isImporting: Boolean = false,
+    val isExporting: Boolean = false,
     val importDialog: WorkoutImportDialog = WorkoutImportDialog.None,
     val importUrl: String = "",
-    val importMessage: WorkoutImportMessage? = null,
+    val message: WorkoutListMessage? = null,
 )
 
 enum class WorkoutImportDialog {
@@ -18,7 +19,7 @@ enum class WorkoutImportDialog {
     UrlInput,
 }
 
-data class WorkoutImportMessage(
+data class WorkoutListMessage(
     val text: String,
     val isError: Boolean,
 )

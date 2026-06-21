@@ -20,6 +20,7 @@ The app is built around two modes:
 - Save completed workout history
 - Prefill set inputs from the latest completed session for the same exercise and set index
 - Import workout templates from a local JSON or YAML file, or a direct JSON/YAML URL
+- Export all templates and session history to a local JSON backup file
 
 ## Importing Workouts
 
@@ -82,6 +83,18 @@ workouts:
 ```
 
 A single workout object with `name` and `circuits` is also accepted as a convenience in either JSON or YAML. Import validation uses the same rules as the workout editor.
+
+## Exporting Data
+
+Use the Export action on the workout list screen to save a JSON backup through Android's document picker.
+
+Exports include:
+
+- all workout templates
+- active, abandoned, and completed workout sessions
+- session snapshots and set entries
+
+The current export schema is JSON-only and uses a top-level `schemaVersion` field so the format can evolve over time.
 
 ## Data Model
 

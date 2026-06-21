@@ -2,6 +2,7 @@ package dev.wwade.workout.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.wwade.workout.domain.exporter.ExportWorkoutDataUseCase
 import dev.wwade.workout.domain.importer.ImportWorkoutsUseCase
 import dev.wwade.workout.domain.importer.WorkoutImportException
 import dev.wwade.workout.domain.importer.WorkoutImportRequest
@@ -12,8 +13,12 @@ import dev.wwade.workout.domain.repository.SessionRepository
 import dev.wwade.workout.domain.repository.WorkoutRepository
 import dev.wwade.workout.domain.usecase.StartWorkoutUseCase
 import dev.wwade.workout.ui.state.WorkoutImportDialog
-import dev.wwade.workout.ui.state.WorkoutImportMessage
+import dev.wwade.workout.ui.state.WorkoutListMessage
 import dev.wwade.workout.ui.state.WorkoutListState
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,6 +31,8 @@ class WorkoutListViewModel(
     private val workoutRepository: WorkoutRepository,
     private val sessionRepository: SessionRepository,
     private val importWorkoutsUseCase: ImportWorkoutsUseCase = ImportWorkoutsUseCase(workoutRepository),
+    private val exportWorkoutDataUseCase: ExportWorkoutDataUseCase,
+    private val clock: Clock = Clock.systemUTC(),
 ) : ViewModel() {
     private val startWorkoutUseCase = StartWorkoutUseCase(sessionRepository)
     private val importState = MutableStateFlow(WorkoutListImportState())
@@ -39,9 +46,10 @@ class WorkoutListViewModel(
             workouts = workouts,
             activeSessionId = activeSessionId,
             isImporting = importState.isImporting,
+            isExporting = importState.isExporting,
             importDialog = importState.importDialog,
             importUrl = importState.importUrl,
-            importMessage = importState.importMessage,
+            message = importState.message,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -63,7 +71,7 @@ class WorkoutListViewModel(
         importState.update {
             it.copy(
                 importDialog = WorkoutImportDialog.ChooseSource,
-                importMessage = null,
+                message = null,
             )
         }
     }
@@ -76,7 +84,7 @@ class WorkoutListViewModel(
         importState.update {
             it.copy(
                 importDialog = WorkoutImportDialog.UrlInput,
-                importMessage = null,
+                message = null,
             )
         }
     }
@@ -86,7 +94,7 @@ class WorkoutListViewModel(
     }
 
     fun clearImportMessage() {
-        importState.update { it.copy(importMessage = null) }
+        importState.update { it.copy(message = null) }
     }
 
     fun showImportError(message: String) {
@@ -94,12 +102,67 @@ class WorkoutListViewModel(
             it.copy(
                 isImporting = false,
                 importDialog = WorkoutImportDialog.None,
-                importMessage = WorkoutImportMessage(
+                message = WorkoutListMessage(
                     text = message,
                     isError = true,
                 ),
             )
         }
+    }
+
+    suspend fun prepareExport(): WorkoutExportFile? {
+        importState.update {
+            it.copy(
+                isExporting = true,
+                message = null,
+            )
+        }
+
+        return runCatching {
+            val artifact = exportWorkoutDataUseCase()
+            WorkoutExportFile(
+                fileName = suggestedExportFileName(artifact.exportedAt),
+                content = artifact.json,
+            )
+        }.onFailure { error ->
+            importState.update {
+                it.copy(
+                    isExporting = false,
+                    message = WorkoutListMessage(
+                        text = error.message ?: "Unable to export workout data.",
+                        isError = true,
+                    ),
+                )
+            }
+        }.getOrNull()
+    }
+
+    fun onExportSaved(fileName: String) {
+        importState.update {
+            it.copy(
+                isExporting = false,
+                message = WorkoutListMessage(
+                    text = "Exported workout data to $fileName.",
+                    isError = false,
+                ),
+            )
+        }
+    }
+
+    fun onExportFailed(message: String) {
+        importState.update {
+            it.copy(
+                isExporting = false,
+                message = WorkoutListMessage(
+                    text = message,
+                    isError = true,
+                ),
+            )
+        }
+    }
+
+    fun onExportCancelled() {
+        importState.update { it.copy(isExporting = false) }
     }
 
     fun importFromJson(rawJson: String) {
@@ -111,7 +174,7 @@ class WorkoutListViewModel(
         if (url.isBlank()) {
             importState.update {
                 it.copy(
-                    importMessage = WorkoutImportMessage(
+                    message = WorkoutListMessage(
                         text = "Enter a direct JSON or YAML URL to import.",
                         isError = true,
                     ),
@@ -128,7 +191,7 @@ class WorkoutListViewModel(
                 it.copy(
                     isImporting = true,
                     importDialog = WorkoutImportDialog.None,
-                    importMessage = null,
+                    message = null,
                 )
             }
 
@@ -138,7 +201,7 @@ class WorkoutListViewModel(
                 importState.update {
                     it.copy(
                         isImporting = false,
-                        importMessage = result.toMessage(),
+                        message = result.toMessage(),
                         importUrl = if (source is WorkoutImportSource.Url) "" else it.importUrl,
                     )
                 }
@@ -146,7 +209,7 @@ class WorkoutListViewModel(
                 importState.update {
                     it.copy(
                         isImporting = false,
-                        importMessage = WorkoutImportMessage(
+                        message = WorkoutListMessage(
                             text = error.importMessage(),
                             isError = true,
                         ),
@@ -156,7 +219,7 @@ class WorkoutListViewModel(
         }
     }
 
-    private fun WorkoutImportResult.toMessage(): WorkoutImportMessage {
+    private fun WorkoutImportResult.toMessage(): WorkoutListMessage {
         val summary = when {
             importedCount == 0 -> "No workouts were imported."
             isSuccess -> "Imported $importedCount workout${importedCount.pluralSuffix()}."
@@ -164,10 +227,17 @@ class WorkoutListViewModel(
             else -> "No workouts were imported."
         }
         val details = workoutErrors.take(3).joinToString(separator = "\n")
-        return WorkoutImportMessage(
+        return WorkoutListMessage(
             text = if (details.isBlank()) summary else "$summary\n$details",
             isError = importedCount == 0,
         )
+    }
+
+    private fun suggestedExportFileName(exportedAt: Long): String {
+        val date = EXPORT_FILE_DATE_FORMAT.format(
+            Instant.ofEpochMilli(exportedAt).atZone(clock.zone),
+        )
+        return "workout-tracker-export-$date.json"
     }
 
     private fun Int.pluralSuffix(): String = if (this == 1) "" else "s"
@@ -182,7 +252,16 @@ class WorkoutListViewModel(
 
 private data class WorkoutListImportState(
     val isImporting: Boolean = false,
+    val isExporting: Boolean = false,
     val importDialog: WorkoutImportDialog = WorkoutImportDialog.None,
     val importUrl: String = "",
-    val importMessage: WorkoutImportMessage? = null,
+    val message: WorkoutListMessage? = null,
 )
+
+data class WorkoutExportFile(
+    val fileName: String,
+    val content: String,
+)
+
+private val EXPORT_FILE_DATE_FORMAT: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneOffset.UTC)

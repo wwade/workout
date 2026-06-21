@@ -1,19 +1,34 @@
 package dev.wwade.workout.ui.viewmodel
 
+import dev.wwade.workout.domain.exporter.ExportWorkoutDataUseCase
+import dev.wwade.workout.domain.exporter.WorkoutDataExportSnapshot
 import dev.wwade.workout.domain.importer.ImportWorkoutsUseCase
 import dev.wwade.workout.domain.importer.WorkoutImportException
 import dev.wwade.workout.domain.importer.WorkoutImportJsonFetcher
 import dev.wwade.workout.domain.importer.validSingleWorkoutJson
 import dev.wwade.workout.domain.importer.validSingleWorkoutYaml
+import dev.wwade.workout.domain.model.CircuitSessionDetail
+import dev.wwade.workout.domain.model.CircuitTemplate
 import dev.wwade.workout.domain.model.CompletedSessionListItem
+import dev.wwade.workout.domain.model.ExerciseSessionDetail
+import dev.wwade.workout.domain.model.ExerciseTemplate
+import dev.wwade.workout.domain.model.LoadKind
+import dev.wwade.workout.domain.model.LoadUnit
+import dev.wwade.workout.domain.model.SessionStatus
+import dev.wwade.workout.domain.model.SetEntry
 import dev.wwade.workout.domain.model.WorkoutDraft
 import dev.wwade.workout.domain.model.WorkoutListItem
+import dev.wwade.workout.domain.model.WorkoutSessionDetail
 import dev.wwade.workout.domain.model.WorkoutTemplate
 import dev.wwade.workout.domain.repository.SessionRepository
+import dev.wwade.workout.domain.repository.WorkoutDataExportRepository
 import dev.wwade.workout.domain.repository.WorkoutRepository
 import dev.wwade.workout.ui.state.WorkoutImportDialog
 import dev.wwade.workout.util.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -44,8 +59,8 @@ class WorkoutListViewModelTest {
         advanceUntilIdle()
 
         assertThat(repository.savedWorkouts.map { it.name }).containsExactly("Imported")
-        assertThat(viewModel.state.value.importMessage?.text).contains("Imported 1 workout")
-        assertThat(viewModel.state.value.importMessage?.isError).isFalse()
+        assertThat(viewModel.state.value.message?.text).contains("Imported 1 workout")
+        assertThat(viewModel.state.value.message?.isError).isFalse()
         collector.cancel()
     }
 
@@ -69,9 +84,9 @@ class WorkoutListViewModelTest {
         )
         advanceUntilIdle()
 
-        assertThat(viewModel.state.value.importMessage?.text).contains("Imported 1 workout; 1 failed")
-        assertThat(viewModel.state.value.importMessage?.text).contains("A workout needs at least one circuit")
-        assertThat(viewModel.state.value.importMessage?.isError).isFalse()
+        assertThat(viewModel.state.value.message?.text).contains("Imported 1 workout; 1 failed")
+        assertThat(viewModel.state.value.message?.text).contains("A workout needs at least one circuit")
+        assertThat(viewModel.state.value.message?.isError).isFalse()
         collector.cancel()
     }
 
@@ -87,8 +102,8 @@ class WorkoutListViewModelTest {
         advanceUntilIdle()
 
         assertThat(repository.savedWorkouts.map { it.name }).containsExactly("Yaml Imported")
-        assertThat(viewModel.state.value.importMessage?.text).contains("Imported 1 workout")
-        assertThat(viewModel.state.value.importMessage?.isError).isFalse()
+        assertThat(viewModel.state.value.message?.text).contains("Imported 1 workout")
+        assertThat(viewModel.state.value.message?.isError).isFalse()
         collector.cancel()
     }
 
@@ -116,7 +131,7 @@ class WorkoutListViewModelTest {
         advanceUntilIdle()
 
         assertThat(viewModel.state.value.isImporting).isFalse()
-        assertThat(viewModel.state.value.importMessage?.text).contains("Imported 1 workout")
+        assertThat(viewModel.state.value.message?.text).contains("Imported 1 workout")
         collector.cancel()
     }
 
@@ -138,8 +153,46 @@ class WorkoutListViewModelTest {
         viewModel.importFromUrl()
         advanceUntilIdle()
 
-        assertThat(viewModel.state.value.importMessage?.text).isEqualTo("Unable to download the workout file.")
-        assertThat(viewModel.state.value.importMessage?.isError).isTrue()
+        assertThat(viewModel.state.value.message?.text).isEqualTo("Unable to download the workout file.")
+        assertThat(viewModel.state.value.message?.isError).isTrue()
+        collector.cancel()
+    }
+
+    @Test
+    fun prepareExportReturnsJsonAndSuggestedFilename() = runTest {
+        val viewModel = viewModel(
+            repository = FakeWorkoutRepository(),
+            exportRepository = FakeWorkoutDataExportRepository(),
+        )
+        val collector = backgroundScope.launch {
+            viewModel.state.collectLatest { }
+        }
+
+        val export = viewModel.prepareExport()
+
+        assertThat(export).isNotNull()
+        assertThat(export?.fileName).isEqualTo("workout-tracker-export-2026-06-21.json")
+        assertThat(export?.content).contains("\"schemaVersion\": 1")
+        assertThat(export?.content).contains("\"workoutName\": \"Leg Day\"")
+        collector.cancel()
+    }
+
+    @Test
+    fun exportCallbacksUpdateMessageState() = runTest {
+        val viewModel = viewModel(FakeWorkoutRepository())
+        val collector = backgroundScope.launch {
+            viewModel.state.collectLatest { }
+        }
+
+        viewModel.onExportSaved("backup.json")
+        advanceUntilIdle()
+        assertThat(viewModel.state.value.isExporting).isFalse()
+        assertThat(viewModel.state.value.message?.text).isEqualTo("Exported workout data to backup.json.")
+
+        viewModel.onExportFailed("disk full")
+        advanceUntilIdle()
+        assertThat(viewModel.state.value.message?.text).isEqualTo("disk full")
+        assertThat(viewModel.state.value.message?.isError).isTrue()
         collector.cancel()
     }
 
@@ -169,6 +222,7 @@ class WorkoutListViewModelTest {
         fetcher: WorkoutImportJsonFetcher = object : WorkoutImportJsonFetcher {
             override suspend fun fetch(url: String): String = validSingleWorkoutJson("Remote")
         },
+        exportRepository: WorkoutDataExportRepository = FakeWorkoutDataExportRepository(),
     ): WorkoutListViewModel {
         return WorkoutListViewModel(
             workoutRepository = repository,
@@ -176,6 +230,10 @@ class WorkoutListViewModelTest {
             importWorkoutsUseCase = ImportWorkoutsUseCase(
                 workoutRepository = repository,
                 jsonFetcher = fetcher,
+            ),
+            exportWorkoutDataUseCase = ExportWorkoutDataUseCase(
+                exportRepository = exportRepository,
+                clock = Clock.fixed(Instant.parse("2026-06-21T07:00:00Z"), ZoneOffset.UTC),
             ),
         )
     }
@@ -223,4 +281,91 @@ private class FakeWorkoutListSessionRepository : SessionRepository {
         exerciseTemplateId: Long,
         setIndex: Int,
     ): dev.wwade.workout.domain.model.SetEntry? = null
+}
+
+private class FakeWorkoutDataExportRepository : WorkoutDataExportRepository {
+    override suspend fun exportSnapshot(): WorkoutDataExportSnapshot {
+        return WorkoutDataExportSnapshot(
+            workouts = listOf(
+                WorkoutTemplate(
+                    id = 1,
+                    name = "Leg Day",
+                    sortOrder = 0,
+                    createdAt = 10,
+                    updatedAt = 20,
+                    circuits = listOf(
+                        CircuitTemplate(
+                            id = 2,
+                            workoutId = 1,
+                            name = "Main",
+                            sortOrder = 0,
+                            exercises = listOf(
+                                ExerciseTemplate(
+                                    id = 3,
+                                    circuitId = 2,
+                                    name = "Squat",
+                                    guidance = "Stay braced",
+                                    repMin = 5,
+                                    repMax = 8,
+                                    loadKind = LoadKind.WEIGHT,
+                                    loadMin = 100.0,
+                                    loadMax = 160.0,
+                                    loadUnit = LoadUnit.LB,
+                                    restTimeSeconds = 120,
+                                    setCount = 3,
+                                    sortOrder = 0,
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            sessions = listOf(
+                WorkoutSessionDetail(
+                    sessionId = 11,
+                    workoutTemplateId = 1,
+                    workoutName = "Leg Day",
+                    startedAt = 100,
+                    completedAt = 200,
+                    status = SessionStatus.COMPLETED,
+                    circuits = listOf(
+                        CircuitSessionDetail(
+                            circuitSessionId = 12,
+                            circuitTemplateId = 2,
+                            name = "Main",
+                            sortOrder = 0,
+                            setCount = 3,
+                            exercises = listOf(
+                                ExerciseSessionDetail(
+                                    exerciseSessionId = 13,
+                                    exerciseTemplateId = 3,
+                                    name = "Squat",
+                                    guidance = "Stay braced",
+                                    repMin = 5,
+                                    repMax = 8,
+                                    loadKind = LoadKind.WEIGHT,
+                                    loadMin = 100.0,
+                                    loadMax = 160.0,
+                                    loadUnit = LoadUnit.LB,
+                                    restTimeSeconds = 120,
+                                    sortOrder = 0,
+                                    sets = listOf(
+                                        SetEntry(
+                                            id = 14,
+                                            exerciseSessionId = 13,
+                                            setIndex = 0,
+                                            repsActual = 5,
+                                            loadActual = 135.0,
+                                            notes = "Solid",
+                                            skipped = false,
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+    }
 }
