@@ -11,12 +11,15 @@ import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performImeAction
 import dev.wwade.workout.domain.model.LoadUnit
 import dev.wwade.workout.ui.screen.ActiveSessionScreen
 import dev.wwade.workout.ui.state.ActiveExerciseCardState
+import dev.wwade.workout.ui.state.ActiveExerciseHistoryDialogState
+import dev.wwade.workout.ui.state.ActiveExerciseHistoryRowState
 import dev.wwade.workout.ui.state.ActiveSessionState
 import org.junit.Rule
 import org.junit.Test
@@ -50,6 +53,8 @@ class ActiveSessionScreenTest {
                 onSelectRound = { _, _ -> },
                 onSaveRound = {},
                 onAbandonSession = {},
+                onShowExerciseHistory = {},
+                onDismissExerciseHistory = {},
             )
         }
 
@@ -99,6 +104,8 @@ class ActiveSessionScreenTest {
                 onSelectRound = { _, _ -> },
                 onSaveRound = {},
                 onAbandonSession = {},
+                onShowExerciseHistory = {},
+                onDismissExerciseHistory = {},
             )
         }
 
@@ -156,6 +163,8 @@ class ActiveSessionScreenTest {
                 onSelectRound = { _, setIndex -> currentSetIndex = setIndex },
                 onSaveRound = {},
                 onAbandonSession = {},
+                onShowExerciseHistory = {},
+                onDismissExerciseHistory = {},
             )
         }
 
@@ -218,12 +227,83 @@ class ActiveSessionScreenTest {
                 onSelectRound = { _, _ -> },
                 onSaveRound = {},
                 onAbandonSession = {},
+                onShowExerciseHistory = {},
+                onDismissExerciseHistory = {},
             )
         }
 
         composeRule.onNodeWithText("Save round").assertIsEnabled()
         composeRule.onNodeWithTag("reps-1").assertTextContains("8")
         composeRule.onNodeWithTag("load-1").assertTextContains("30")
+    }
+
+    @Test
+    fun previousWorkoutHistoryAndMoreHistoryDialogAreShown() {
+        var state by mutableStateOf(
+            activeSessionState(currentSetIndex = 0).copy(
+                exerciseCards = listOf(
+                    exerciseCard(
+                        exerciseSessionId = 1,
+                        exerciseName = "Exercise 1",
+                        repsInput = "8",
+                        loadInput = "30",
+                    ).copy(
+                        previousWorkoutHistory = listOf(
+                            historyRow(setLabel = "Set 1", resultLabel = "8 reps - 30 lb"),
+                            historyRow(setLabel = "Set 2", resultLabel = "7 reps - 30 lb"),
+                        ),
+                        fullHistory = listOf(
+                            historyRow(setLabel = "Set 1", resultLabel = "8 reps - 30 lb"),
+                            historyRow(
+                                workoutName = "Older workout",
+                                completedAtLabel = "Jun 1",
+                                setLabel = "Set 1",
+                                resultLabel = "6 reps - 25 lb",
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        composeRule.setContent {
+            ActiveSessionScreen(
+                state = state,
+                onBack = {},
+                onUpdateReps = { _, _ -> },
+                onUpdateLoad = { _, _ -> },
+                onUpdateNotes = { _, _ -> },
+                onUpdateSkipped = { _, _ -> },
+                onPreviousRound = {},
+                onNextRound = {},
+                onSelectRound = { _, _ -> },
+                onSaveRound = {},
+                onAbandonSession = {},
+                onShowExerciseHistory = { exerciseSessionId ->
+                    val exercise = state.exerciseCards.single { it.exerciseSessionId == exerciseSessionId }
+                    state = state.copy(
+                        historyDialog = ActiveExerciseHistoryDialogState(
+                            exerciseSessionId = exercise.exerciseSessionId,
+                            exerciseName = exercise.exerciseName,
+                            rows = exercise.fullHistory,
+                        ),
+                    )
+                },
+                onDismissExerciseHistory = {
+                    state = state.copy(historyDialog = null)
+                },
+            )
+        }
+
+        composeRule.onNodeWithTag("history-preview-1").assertIsDisplayed()
+        composeRule.onNodeWithText("Previous workout").assertIsDisplayed()
+        composeRule.onNodeWithText("8 reps - 30 lb").assertIsDisplayed()
+        composeRule.onNodeWithText("7 reps - 30 lb").assertIsDisplayed()
+
+        composeRule.onNodeWithTag("history-more-1").performClick()
+        composeRule.onNodeWithText("Exercise 1 history").assertIsDisplayed()
+        composeRule.onNodeWithText("Older workout", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("6 reps - 25 lb").assertIsDisplayed()
     }
 
     private fun activeSessionState(currentSetIndex: Int, exerciseCount: Int = 2): ActiveSessionState {
@@ -272,6 +352,22 @@ class ActiveSessionScreenTest {
             loadInput = loadInput,
             notesInput = "",
             skipped = false,
+        )
+    }
+
+    private fun historyRow(
+        workoutName: String = "Previous workout",
+        completedAtLabel: String = "Jun 14",
+        setLabel: String,
+        resultLabel: String,
+    ): ActiveExerciseHistoryRowState {
+        return ActiveExerciseHistoryRowState(
+            workoutSessionId = 1,
+            workoutName = workoutName,
+            completedAtLabel = completedAtLabel,
+            setLabel = setLabel,
+            resultLabel = resultLabel,
+            notes = "",
         )
     }
 

@@ -69,6 +69,65 @@ abstract class WorkoutSessionDao {
         setIndex: Int,
     ): SetEntryEntity?
 
+    @Query(
+        """
+        SELECT
+            ws.id AS workoutSessionId,
+            ws.workoutNameSnapshot AS workoutName,
+            COALESCE(ws.completedAt, ws.startedAt) AS completedAt,
+            se.setIndex AS setIndex,
+            se.repsActual AS repsActual,
+            se.loadActual AS loadActual,
+            se.notes AS notes,
+            se.skipped AS skipped
+        FROM set_entries se
+        INNER JOIN exercise_sessions es ON es.id = se.exerciseSessionId
+        INNER JOIN circuit_sessions cs ON cs.id = es.circuitSessionId
+        INNER JOIN workout_sessions ws ON ws.id = cs.workoutSessionId
+        WHERE es.exerciseTemplateId = :exerciseTemplateId
+            AND ws.status = 'COMPLETED'
+            AND ws.id = (
+                SELECT ws2.id FROM workout_sessions ws2
+                INNER JOIN circuit_sessions cs2 ON cs2.workoutSessionId = ws2.id
+                INNER JOIN exercise_sessions es2 ON es2.circuitSessionId = cs2.id
+                WHERE es2.exerciseTemplateId = :exerciseTemplateId
+                    AND ws2.status = 'COMPLETED'
+                ORDER BY ws2.completedAt DESC, ws2.id DESC
+                LIMIT 1
+            )
+        ORDER BY se.setIndex ASC
+        """,
+    )
+    abstract suspend fun getPreviousWorkoutSetEntries(
+        exerciseTemplateId: Long,
+    ): List<ExerciseSetHistoryProjection>
+
+    @Query(
+        """
+        SELECT
+            ws.id AS workoutSessionId,
+            ws.workoutNameSnapshot AS workoutName,
+            COALESCE(ws.completedAt, ws.startedAt) AS completedAt,
+            se.setIndex AS setIndex,
+            se.repsActual AS repsActual,
+            se.loadActual AS loadActual,
+            se.notes AS notes,
+            se.skipped AS skipped
+        FROM set_entries se
+        INNER JOIN exercise_sessions es ON es.id = se.exerciseSessionId
+        INNER JOIN circuit_sessions cs ON cs.id = es.circuitSessionId
+        INNER JOIN workout_sessions ws ON ws.id = cs.workoutSessionId
+        WHERE es.exerciseTemplateId = :exerciseTemplateId
+            AND ws.status = 'COMPLETED'
+        ORDER BY ws.completedAt DESC, ws.id DESC, se.setIndex ASC
+        LIMIT :limit
+        """,
+    )
+    abstract suspend fun getRecentCompletedSetEntries(
+        exerciseTemplateId: Long,
+        limit: Int,
+    ): List<ExerciseSetHistoryProjection>
+
     @Transaction
     open suspend fun startWorkoutSession(template: WorkoutTemplateWithChildren): Long {
         val sessionId = insertWorkoutSession(

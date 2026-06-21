@@ -147,6 +147,17 @@ data class SetEntryEntity(
     val skipped: Boolean,
 )
 
+data class ExerciseSetHistoryProjection(
+    val workoutSessionId: Long,
+    val workoutName: String,
+    val completedAt: Long,
+    val setIndex: Int,
+    val repsActual: Int?,
+    val loadActual: Double?,
+    val notes: String,
+    val skipped: Boolean,
+)
+
 data class CircuitTemplateWithExercises(
     @Embedded val circuit: CircuitTemplateEntity,
     @Relation(

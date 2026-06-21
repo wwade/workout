@@ -2,13 +2,20 @@ package dev.wwade.workout.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.wwade.workout.domain.model.ExerciseSetHistoryItem
 import dev.wwade.workout.domain.model.ExerciseProgressSnapshot
+import dev.wwade.workout.domain.model.LoadUnit
 import dev.wwade.workout.domain.model.SetEntryDraft
 import dev.wwade.workout.domain.repository.SessionRepository
 import dev.wwade.workout.domain.usecase.SessionProgressCalculator
 import dev.wwade.workout.ui.state.ActiveExerciseCardState
+import dev.wwade.workout.ui.state.ActiveExerciseHistoryDialogState
+import dev.wwade.workout.ui.state.ActiveExerciseHistoryRowState
 import dev.wwade.workout.ui.state.ActiveSessionState
 import dev.wwade.workout.ui.state.SessionPositionOptionState
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -22,14 +29,16 @@ class ActiveSessionViewModel(
 ) : ViewModel() {
     private val overrides = MutableStateFlow<Map<RoundKey, Map<Long, EditableEntry>>>(emptyMap())
     private val selectedPosition = MutableStateFlow<SessionProgressCalculator.CurrentPosition?>(null)
+    private val selectedHistoryExerciseSessionId = MutableStateFlow<Long?>(null)
     private val transientUiState = MutableStateFlow(TransientUiState())
 
     val state: StateFlow<ActiveSessionState> = combine(
         sessionRepository.observeSessionDetail(sessionId),
         selectedPosition,
         overrides,
+        selectedHistoryExerciseSessionId,
         transientUiState,
-    ) { detail, selected, inputOverrides, transient ->
+    ) { detail, selected, inputOverrides, historyExerciseSessionId, transient ->
         if (detail == null) {
             ActiveSessionState(errorMessage = "Session not found.")
         } else {
@@ -51,6 +60,16 @@ class ActiveSessionViewModel(
             val roundOverrides = inputOverrides[activeRoundKey].orEmpty()
             val exerciseCards = progress.exercises.map { card ->
                 val override = roundOverrides[card.exerciseSessionId]
+                val previousWorkoutHistory = card.exerciseTemplateId?.let { exerciseTemplateId ->
+                    sessionRepository.getPreviousWorkoutSetEntries(exerciseTemplateId)
+                        .map { it.toHistoryRow(card.loadUnit) }
+                }.orEmpty()
+                val fullHistory = card.exerciseTemplateId?.let { exerciseTemplateId ->
+                    sessionRepository.getRecentCompletedSetEntries(
+                        exerciseTemplateId = exerciseTemplateId,
+                        limit = MaxHistoryRows,
+                    ).map { it.toHistoryRow(card.loadUnit) }
+                }.orEmpty()
                 ActiveExerciseCardState(
                     exerciseSessionId = card.exerciseSessionId,
                     exerciseTemplateId = card.exerciseTemplateId,
@@ -64,6 +83,8 @@ class ActiveSessionViewModel(
                     loadInput = override?.load ?: card.suggestedLoad?.let(::formatLoad).orEmpty(),
                     notesInput = override?.notes ?: card.suggestedNotes,
                     skipped = override?.skipped ?: card.suggestedSkipped,
+                    previousWorkoutHistory = previousWorkoutHistory,
+                    fullHistory = fullHistory,
                 )
             }
             val currentPosition = progress.availablePositions.firstOrNull {
@@ -108,6 +129,15 @@ class ActiveSessionViewModel(
                     )
                 },
                 exerciseCards = exerciseCards,
+                historyDialog = exerciseCards.firstOrNull {
+                    it.exerciseSessionId == historyExerciseSessionId
+                }?.let { exercise ->
+                    ActiveExerciseHistoryDialogState(
+                        exerciseSessionId = exercise.exerciseSessionId,
+                        exerciseName = exercise.exerciseName,
+                        rows = exercise.fullHistory,
+                    )
+                },
             )
         }
     }.stateIn(
@@ -130,6 +160,14 @@ class ActiveSessionViewModel(
 
     fun updateSkipped(exerciseSessionId: Long, skipped: Boolean) {
         overrides.updateEntry(state.value.currentRoundKey(), exerciseSessionId) { copy(skipped = skipped) }
+    }
+
+    fun showExerciseHistory(exerciseSessionId: Long) {
+        selectedHistoryExerciseSessionId.value = exerciseSessionId
+    }
+
+    fun dismissExerciseHistory() {
+        selectedHistoryExerciseSessionId.value = null
     }
 
     fun goToPreviousRound() {
@@ -248,6 +286,26 @@ private fun formatLoad(value: Double): String {
     }
 }
 
+private fun ExerciseSetHistoryItem.toHistoryRow(loadUnit: LoadUnit): ActiveExerciseHistoryRowState {
+    return ActiveExerciseHistoryRowState(
+        workoutSessionId = workoutSessionId,
+        workoutName = workoutName,
+        completedAtLabel = HistoryDateFormatter.format(
+            Instant.ofEpochMilli(completedAt).atZone(ZoneId.systemDefault()),
+        ),
+        setLabel = "Set ${setIndex + 1}",
+        resultLabel = if (skipped) {
+            "Skipped"
+        } else {
+            listOfNotNull(
+                repsActual?.let { "$it reps" },
+                loadActual?.let { "${formatLoad(it)} ${loadUnit.name.lowercase()}" },
+            ).joinToString(" - ").ifBlank { "No values" }
+        },
+        notes = notes,
+    )
+}
+
 private fun List<ActiveExerciseCardState>.hasChangesComparedTo(
     snapshots: List<ExerciseProgressSnapshot>,
 ): Boolean {
@@ -259,3 +317,7 @@ private fun List<ActiveExerciseCardState>.hasChangesComparedTo(
             card.skipped != snapshot.suggestedSkipped
     }
 }
+
+private const val MaxHistoryRows = 24
+
+private val HistoryDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d")

@@ -129,6 +129,17 @@ data class SetEntry(
     val skipped: Boolean,
 )
 
+data class ExerciseSetHistoryItem(
+    val workoutSessionId: Long,
+    val workoutName: String,
+    val completedAt: Long,
+    val setIndex: Int,
+    val repsActual: Int?,
+    val loadActual: Double?,
+    val notes: String,
+    val skipped: Boolean,
+)
+
 data class SetEntryDraft(
     val exerciseSessionId: Long,
     val setIndex: Int,

@@ -19,6 +19,7 @@ data class ActiveSessionState(
     val errorMessage: String? = null,
     val positionOptions: List<SessionPositionOptionState> = emptyList(),
     val exerciseCards: List<ActiveExerciseCardState> = emptyList(),
+    val historyDialog: ActiveExerciseHistoryDialogState? = null,
 )
 
 data class SessionPositionOptionState(
@@ -42,4 +43,21 @@ data class ActiveExerciseCardState(
     val loadInput: String,
     val notesInput: String,
     val skipped: Boolean,
+    val previousWorkoutHistory: List<ActiveExerciseHistoryRowState> = emptyList(),
+    val fullHistory: List<ActiveExerciseHistoryRowState> = emptyList(),
+)
+
+data class ActiveExerciseHistoryRowState(
+    val workoutSessionId: Long,
+    val workoutName: String,
+    val completedAtLabel: String,
+    val setLabel: String,
+    val resultLabel: String,
+    val notes: String,
+)
+
+data class ActiveExerciseHistoryDialogState(
+    val exerciseSessionId: Long,
+    val exerciseName: String,
+    val rows: List<ActiveExerciseHistoryRowState>,
 )

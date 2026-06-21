@@ -2,6 +2,7 @@ package dev.wwade.workout.data.repository
 
 import dev.wwade.workout.data.db.CircuitSessionWithExercises
 import dev.wwade.workout.data.db.CircuitTemplateWithExercises
+import dev.wwade.workout.data.db.ExerciseSetHistoryProjection
 import dev.wwade.workout.data.db.ExerciseSessionEntity
 import dev.wwade.workout.data.db.ExerciseTemplateEntity
 import dev.wwade.workout.data.db.SetEntryEntity
@@ -13,6 +14,7 @@ import dev.wwade.workout.domain.model.CircuitSessionDetail
 import dev.wwade.workout.domain.model.CircuitTemplate
 import dev.wwade.workout.domain.model.CompletedSessionListItem
 import dev.wwade.workout.domain.model.ExerciseSessionDetail
+import dev.wwade.workout.domain.model.ExerciseSetHistoryItem
 import dev.wwade.workout.domain.model.ExerciseTemplate
 import dev.wwade.workout.domain.model.SetEntry
 import dev.wwade.workout.domain.model.WorkoutListItem
@@ -114,6 +116,19 @@ fun SetEntryEntity.toDomain(): SetEntry {
     return SetEntry(
         id = id,
         exerciseSessionId = exerciseSessionId,
+        setIndex = setIndex,
+        repsActual = repsActual,
+        loadActual = loadActual,
+        notes = notes,
+        skipped = skipped,
+    )
+}
+
+fun ExerciseSetHistoryProjection.toDomain(): ExerciseSetHistoryItem {
+    return ExerciseSetHistoryItem(
+        workoutSessionId = workoutSessionId,
+        workoutName = workoutName,
+        completedAt = completedAt,
         setIndex = setIndex,
         repsActual = repsActual,
         loadActual = loadActual,

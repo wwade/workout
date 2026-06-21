@@ -117,6 +117,13 @@ class SessionPrefillWorkflowTest {
 
         val completedFirstSession = sessionRepository.getSessionDetail(firstSessionId)!!
         assertThat(SessionProgressCalculator.isCompleted(completedFirstSession)).isTrue()
+        val previousWorkoutSets = sessionRepository.getPreviousWorkoutSetEntries(
+            exerciseTemplateId = firstCircuitExercises[0].exerciseTemplateId!!,
+        )
+        assertThat(previousWorkoutSets.map { it.setIndex to it.repsActual }).containsExactly(
+            0 to 8,
+            1 to 8,
+        ).inOrder()
 
         val secondSessionId = sessionRepository.startWorkout(workoutId)
         val secondWorkoutSnapshot = snapshotFor(secondSessionId)

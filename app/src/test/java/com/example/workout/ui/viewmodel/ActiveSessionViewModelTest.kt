@@ -3,6 +3,7 @@ package dev.wwade.workout.ui.viewmodel
 import dev.wwade.workout.domain.model.CircuitSessionDetail
 import dev.wwade.workout.domain.model.CompletedSessionListItem
 import dev.wwade.workout.domain.model.ExerciseSessionDetail
+import dev.wwade.workout.domain.model.ExerciseSetHistoryItem
 import dev.wwade.workout.domain.model.LoadKind
 import dev.wwade.workout.domain.model.LoadUnit
 import dev.wwade.workout.domain.model.SessionStatus
@@ -176,6 +177,41 @@ class ActiveSessionViewModelTest {
         assertThat(state.exerciseCards.single().repsInput).isEqualTo("8")
         assertThat(state.exerciseCards.single().loadInput).isEqualTo("30")
         assertThat(state.canSaveRound).isTrue()
+        collector.cancel()
+    }
+
+    @Test
+    fun exerciseCardsIncludePreviousWorkoutHistoryAndDialogRows() = runTest {
+        val repository = FakeSessionRepository(sessionDetail())
+        val viewModel = ActiveSessionViewModel(
+            sessionRepository = repository,
+            sessionId = 1,
+        )
+        val collector = backgroundScope.launch {
+            viewModel.state.collectLatest { }
+        }
+
+        advanceUntilIdle()
+        val exercise = viewModel.state.value.exerciseCards.single()
+        assertThat(exercise.previousWorkoutHistory.map { it.resultLabel }).containsExactly(
+            "8 reps - 30 lb",
+            "7 reps - 30 lb",
+        ).inOrder()
+
+        viewModel.showExerciseHistory(exercise.exerciseSessionId)
+        advanceUntilIdle()
+
+        val dialog = viewModel.state.value.historyDialog
+        assertThat(dialog?.exerciseName).isEqualTo("Press")
+        assertThat(dialog?.rows?.map { it.workoutName }).containsExactly(
+            "Previous workout",
+            "Previous workout",
+            "Older workout",
+        ).inOrder()
+
+        viewModel.dismissExerciseHistory()
+        advanceUntilIdle()
+        assertThat(viewModel.state.value.historyDialog).isNull()
         collector.cancel()
     }
 
@@ -399,6 +435,43 @@ private class FakeSessionRepository(
             setIndex = setIndex,
             repsActual = 8,
             loadActual = 30.0,
+            notes = "",
+            skipped = false,
+        )
+    }
+
+    override suspend fun getPreviousWorkoutSetEntries(exerciseTemplateId: Long): List<ExerciseSetHistoryItem> {
+        return listOf(
+            historyItem(workoutName = "Previous workout", setIndex = 0, reps = 8, load = 30.0),
+            historyItem(workoutName = "Previous workout", setIndex = 1, reps = 7, load = 30.0),
+        )
+    }
+
+    override suspend fun getRecentCompletedSetEntries(
+        exerciseTemplateId: Long,
+        limit: Int,
+    ): List<ExerciseSetHistoryItem> {
+        return listOf(
+            historyItem(workoutName = "Previous workout", setIndex = 0, reps = 8, load = 30.0),
+            historyItem(workoutName = "Previous workout", setIndex = 1, reps = 7, load = 30.0),
+            historyItem(workoutSessionId = 2, workoutName = "Older workout", setIndex = 0, reps = 6, load = 25.0),
+        ).take(limit)
+    }
+
+    private fun historyItem(
+        workoutSessionId: Long = 1,
+        workoutName: String,
+        setIndex: Int,
+        reps: Int,
+        load: Double,
+    ): ExerciseSetHistoryItem {
+        return ExerciseSetHistoryItem(
+            workoutSessionId = workoutSessionId,
+            workoutName = workoutName,
+            completedAt = 1_771_032_000_000,
+            setIndex = setIndex,
+            repsActual = reps,
+            loadActual = load,
             notes = "",
             skipped = false,
         )

@@ -1,6 +1,7 @@
 package dev.wwade.workout.domain.repository
 
 import dev.wwade.workout.domain.model.CompletedSessionListItem
+import dev.wwade.workout.domain.model.ExerciseSetHistoryItem
 import dev.wwade.workout.domain.model.SetEntry
 import dev.wwade.workout.domain.model.SetEntryDraft
 import dev.wwade.workout.domain.model.WorkoutSessionDetail
@@ -15,4 +16,9 @@ interface SessionRepository {
     suspend fun getSessionDetail(sessionId: Long): WorkoutSessionDetail?
     fun observeCompletedSessions(): Flow<List<CompletedSessionListItem>>
     suspend fun getLatestCompletedSetEntry(exerciseTemplateId: Long, setIndex: Int): SetEntry?
+    suspend fun getPreviousWorkoutSetEntries(exerciseTemplateId: Long): List<ExerciseSetHistoryItem>
+    suspend fun getRecentCompletedSetEntries(
+        exerciseTemplateId: Long,
+        limit: Int,
+    ): List<ExerciseSetHistoryItem>
 }

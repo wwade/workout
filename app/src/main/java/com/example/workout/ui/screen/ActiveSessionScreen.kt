@@ -7,14 +7,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
@@ -54,6 +57,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import dev.wwade.workout.ui.state.ActiveSessionState
+import dev.wwade.workout.ui.state.ActiveExerciseCardState
+import dev.wwade.workout.ui.state.ActiveExerciseHistoryRowState
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -70,6 +75,8 @@ fun ActiveSessionScreen(
     onSelectRound: (Int, Int) -> Unit,
     onSaveRound: () -> Unit,
     onAbandonSession: () -> Unit,
+    onShowExerciseHistory: (Long) -> Unit,
+    onDismissExerciseHistory: () -> Unit,
 ) {
     val focusManager = LocalFocusManager.current
     val coroutineScope = rememberCoroutineScope()
@@ -83,6 +90,32 @@ fun ActiveSessionScreen(
         if (!state.isCompleted) {
             listState.scrollToItem(0)
         }
+    }
+
+    state.historyDialog?.let { dialog ->
+        AlertDialog(
+            onDismissRequest = onDismissExerciseHistory,
+            title = { Text("${dialog.exerciseName} history") },
+            text = {
+                if (dialog.rows.isEmpty()) {
+                    Text("No completed sets yet.")
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.heightIn(max = 420.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        items(dialog.rows) { row ->
+                            HistoryRow(row = row, includeWorkoutName = true)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = onDismissExerciseHistory) {
+                    Text("Close")
+                }
+            },
+        )
     }
 
     Scaffold(
@@ -225,6 +258,10 @@ fun ActiveSessionScreen(
                         Text("Target reps: ${exercise.repRangeLabel}")
                         Text("Target load: ${exercise.loadRangeLabel}")
                         Text("Rest: ${exercise.restTimeSeconds} sec")
+                        ExerciseHistoryPreview(
+                            exercise = exercise,
+                            onShowExerciseHistory = onShowExerciseHistory,
+                        )
                         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                             Checkbox(
                                 checked = exercise.skipped,
@@ -298,6 +335,83 @@ fun ActiveSessionScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ExerciseHistoryPreview(
+    exercise: ActiveExerciseCardState,
+    onShowExerciseHistory: (Long) -> Unit,
+) {
+    if (exercise.previousWorkoutHistory.isEmpty() && exercise.fullHistory.isEmpty()) {
+        return
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("history-preview-${exercise.exerciseSessionId}"),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        ) {
+            Text("Previous workout", style = MaterialTheme.typography.titleSmall)
+            TextButton(
+                onClick = { onShowExerciseHistory(exercise.exerciseSessionId) },
+                modifier = Modifier.testTag("history-more-${exercise.exerciseSessionId}"),
+            ) {
+                Text("More history")
+            }
+        }
+        if (exercise.previousWorkoutHistory.isEmpty()) {
+            Text(
+                text = "No completed sets yet.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        } else {
+            exercise.previousWorkoutHistory.forEach { row ->
+                HistoryRow(row = row, includeWorkoutName = false)
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistoryRow(
+    row: ActiveExerciseHistoryRowState,
+    includeWorkoutName: Boolean,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = if (includeWorkoutName) {
+                    "${row.completedAtLabel} - ${row.workoutName}"
+                } else {
+                    row.completedAtLabel
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = row.setLabel,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text(row.resultLabel, style = MaterialTheme.typography.bodyMedium)
+        if (row.notes.isNotBlank()) {
+            Text(
+                text = row.notes,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

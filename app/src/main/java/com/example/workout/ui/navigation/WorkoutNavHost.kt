@@ -157,6 +157,8 @@ fun WorkoutNavHost(
                         }
                     }
                 },
+                onShowExerciseHistory = viewModel::showExerciseHistory,
+                onDismissExerciseHistory = viewModel::dismissExerciseHistory,
             )
         }
 

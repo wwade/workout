@@ -4,6 +4,7 @@ import dev.wwade.workout.data.db.SetEntryEntity
 import dev.wwade.workout.data.db.WorkoutSessionDao
 import dev.wwade.workout.data.db.WorkoutTemplateDao
 import dev.wwade.workout.domain.model.CompletedSessionListItem
+import dev.wwade.workout.domain.model.ExerciseSetHistoryItem
 import dev.wwade.workout.domain.model.SetEntry
 import dev.wwade.workout.domain.model.SetEntryDraft
 import dev.wwade.workout.domain.model.SessionStatus
@@ -89,5 +90,22 @@ class RoomSessionRepository(
             exerciseTemplateId = exerciseTemplateId,
             setIndex = setIndex,
         )?.toDomain()
+    }
+
+    override suspend fun getPreviousWorkoutSetEntries(
+        exerciseTemplateId: Long,
+    ): List<ExerciseSetHistoryItem> {
+        return workoutSessionDao.getPreviousWorkoutSetEntries(exerciseTemplateId)
+            .map { it.toDomain() }
+    }
+
+    override suspend fun getRecentCompletedSetEntries(
+        exerciseTemplateId: Long,
+        limit: Int,
+    ): List<ExerciseSetHistoryItem> {
+        return workoutSessionDao.getRecentCompletedSetEntries(
+            exerciseTemplateId = exerciseTemplateId,
+            limit = limit,
+        ).map { it.toDomain() }
     }
 }

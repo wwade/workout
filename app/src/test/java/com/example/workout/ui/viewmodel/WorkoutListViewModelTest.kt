@@ -11,6 +11,7 @@ import dev.wwade.workout.domain.model.CircuitSessionDetail
 import dev.wwade.workout.domain.model.CircuitTemplate
 import dev.wwade.workout.domain.model.CompletedSessionListItem
 import dev.wwade.workout.domain.model.ExerciseSessionDetail
+import dev.wwade.workout.domain.model.ExerciseSetHistoryItem
 import dev.wwade.workout.domain.model.ExerciseTemplate
 import dev.wwade.workout.domain.model.LoadKind
 import dev.wwade.workout.domain.model.LoadUnit
@@ -281,6 +282,15 @@ private class FakeWorkoutListSessionRepository : SessionRepository {
         exerciseTemplateId: Long,
         setIndex: Int,
     ): dev.wwade.workout.domain.model.SetEntry? = null
+
+    override suspend fun getPreviousWorkoutSetEntries(
+        exerciseTemplateId: Long,
+    ): List<ExerciseSetHistoryItem> = emptyList()
+
+    override suspend fun getRecentCompletedSetEntries(
+        exerciseTemplateId: Long,
+        limit: Int,
+    ): List<ExerciseSetHistoryItem> = emptyList()
 }
 
 private class FakeWorkoutDataExportRepository : WorkoutDataExportRepository {
