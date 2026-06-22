@@ -43,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import dev.wwade.workout.domain.model.WorkoutListItem
 import dev.wwade.workout.ui.state.WorkoutImportDialog
@@ -303,7 +304,8 @@ private fun WorkoutListContent(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                            .testTag("workout-row-${workout.id}"),
                     ) {
                         Column(
                             modifier = Modifier.padding(16.dp),
@@ -331,12 +333,18 @@ private fun WorkoutListContent(
                                     }
                                 }
                                 if (state.activeSessionId != null) {
-                                    TextButton(onClick = { onResumeWorkout(state.activeSessionId) }) {
+                                    TextButton(
+                                        onClick = { onResumeWorkout(state.activeSessionId) },
+                                        modifier = Modifier.testTag("resume-workout"),
+                                    ) {
                                         Icon(Icons.Default.PlayArrow, contentDescription = null)
                                         Text("Resume")
                                     }
                                 } else {
-                                    TextButton(onClick = { onStartWorkout(workout.id) }) {
+                                    TextButton(
+                                        onClick = { onStartWorkout(workout.id) },
+                                        modifier = Modifier.testTag("start-workout-${workout.id}"),
+                                    ) {
                                         Icon(Icons.Default.PlayArrow, contentDescription = null)
                                         Text("Start")
                                     }
