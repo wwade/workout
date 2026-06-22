@@ -1,5 +1,6 @@
 .gradle/
 .gradle-user/
+.gradle-user-ci-debug*/
 .gradle-user-import/
 .gradle-user-yaml/
 .idea/
