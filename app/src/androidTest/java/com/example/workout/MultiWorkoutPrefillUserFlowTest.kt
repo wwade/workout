@@ -273,7 +273,12 @@ class MultiWorkoutPrefillUserFlowTest {
                     state = state,
                     onCreateWorkout = {},
                     onEditWorkout = {},
-                    onDeleteWorkout = viewModel::deleteWorkout,
+                    onSelectWorkout = viewModel::selectWorkout,
+                    onToggleWorkoutSelection = viewModel::toggleWorkoutSelection,
+                    onClearSelection = viewModel::clearSelection,
+                    onRequestDeleteSelected = viewModel::requestDeleteSelected,
+                    onCancelDelete = viewModel::cancelDelete,
+                    onConfirmDelete = viewModel::confirmDelete,
                     onStartWorkout = { workoutId ->
                         scope.launch {
                             route = TestRoute.Session(viewModel.startWorkout(workoutId))

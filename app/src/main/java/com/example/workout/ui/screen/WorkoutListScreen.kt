@@ -1,7 +1,10 @@
 package dev.wwade.workout.ui.screen
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -13,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
@@ -23,6 +27,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -57,7 +62,12 @@ fun WorkoutListScreen(
     state: WorkoutListState,
     onCreateWorkout: () -> Unit,
     onEditWorkout: (Long) -> Unit,
-    onDeleteWorkout: (WorkoutListItem) -> Unit,
+    onSelectWorkout: (Long) -> Unit,
+    onToggleWorkoutSelection: (Long) -> Unit,
+    onClearSelection: () -> Unit,
+    onRequestDeleteSelected: () -> Unit,
+    onCancelDelete: () -> Unit,
+    onConfirmDelete: () -> Unit,
     onStartWorkout: (Long) -> Unit,
     onResumeWorkout: (Long) -> Unit,
     onOpenHistory: () -> Unit,
@@ -78,6 +88,9 @@ fun WorkoutListScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var pendingExport by remember { mutableStateOf<WorkoutExportFile?>(null) }
+
+    BackHandler(enabled = state.isSelectionMode, onBack = onClearSelection)
+
     val importFileLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri ->
@@ -118,38 +131,61 @@ fun WorkoutListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Workout Tracker") },
-                actions = {
-                    IconButton(
-                        onClick = {
-                            scope.launch {
-                                val export = onPrepareExport() ?: return@launch
-                                pendingExport = export
-                                exportFileLauncher.launch(export.fileName)
-                            }
+                title = {
+                    Text(
+                        if (state.isSelectionMode) {
+                            "${state.selectedWorkoutIds.size} selected"
+                        } else {
+                            "Workout Tracker"
                         },
-                        enabled = !state.isImporting && !state.isExporting,
-                    ) {
-                        Icon(Icons.Default.FileDownload, contentDescription = "Export data")
+                    )
+                },
+                navigationIcon = {
+                    if (state.isSelectionMode) {
+                        IconButton(onClick = onClearSelection) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear selection")
+                        }
                     }
-                    IconButton(
-                        onClick = onShowImportOptions,
-                        enabled = !state.isImporting && !state.isExporting,
-                    ) {
-                        Icon(Icons.Default.FileUpload, contentDescription = "Import data")
-                    }
-                    IconButton(onClick = onOpenHistory) {
-                        Icon(Icons.Default.History, contentDescription = "History")
-                    }
-                    IconButton(onClick = onOpenExerciseLibrary) {
-                        Icon(Icons.Default.FitnessCenter, contentDescription = "Exercises")
+                },
+                actions = {
+                    if (state.isSelectionMode) {
+                        IconButton(onClick = onRequestDeleteSelected) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete selected workouts")
+                        }
+                    } else {
+                        IconButton(
+                            onClick = {
+                                scope.launch {
+                                    val export = onPrepareExport() ?: return@launch
+                                    pendingExport = export
+                                    exportFileLauncher.launch(export.fileName)
+                                }
+                            },
+                            enabled = !state.isImporting && !state.isExporting,
+                        ) {
+                            Icon(Icons.Default.FileDownload, contentDescription = "Export data")
+                        }
+                        IconButton(
+                            onClick = onShowImportOptions,
+                            enabled = !state.isImporting && !state.isExporting,
+                        ) {
+                            Icon(Icons.Default.FileUpload, contentDescription = "Import data")
+                        }
+                        IconButton(onClick = onOpenHistory) {
+                            Icon(Icons.Default.History, contentDescription = "History")
+                        }
+                        IconButton(onClick = onOpenExerciseLibrary) {
+                            Icon(Icons.Default.FitnessCenter, contentDescription = "Exercises")
+                        }
                     }
                 },
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onCreateWorkout) {
-                Icon(Icons.Default.Add, contentDescription = "Create workout")
+            if (!state.isSelectionMode) {
+                FloatingActionButton(onClick = onCreateWorkout) {
+                    Icon(Icons.Default.Add, contentDescription = "Create workout")
+                }
             }
         },
     ) { padding ->
@@ -157,10 +193,34 @@ fun WorkoutListScreen(
             state = state,
             padding = padding,
             onEditWorkout = onEditWorkout,
-            onDeleteWorkout = onDeleteWorkout,
+            onSelectWorkout = onSelectWorkout,
+            onToggleWorkoutSelection = onToggleWorkoutSelection,
             onStartWorkout = onStartWorkout,
             onResumeWorkout = onResumeWorkout,
             onDismissImportMessage = onDismissImportMessage,
+        )
+    }
+
+    if (state.pendingDeleteCount > 0) {
+        AlertDialog(
+            onDismissRequest = onCancelDelete,
+            title = { Text("Delete workouts?") },
+            text = {
+                Text(
+                    "Delete ${state.pendingDeleteCount} workout " +
+                        if (state.pendingDeleteCount == 1) "template?" else "templates?",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = onConfirmDelete) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onCancelDelete) {
+                    Text("Cancel")
+                }
+            },
         )
     }
 
@@ -234,7 +294,8 @@ private fun WorkoutListContent(
     state: WorkoutListState,
     padding: PaddingValues,
     onEditWorkout: (Long) -> Unit,
-    onDeleteWorkout: (WorkoutListItem) -> Unit,
+    onSelectWorkout: (Long) -> Unit,
+    onToggleWorkoutSelection: (Long) -> Unit,
     onStartWorkout: (Long) -> Unit,
     onResumeWorkout: (Long) -> Unit,
     onDismissImportMessage: () -> Unit,
@@ -296,59 +357,102 @@ private fun WorkoutListContent(
             }
         } else {
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize(),
+                modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 items(state.workouts, key = { it.id }) { workout ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp)
-                            .testTag("workout-row-${workout.id}"),
+                    WorkoutRow(
+                        workout = workout,
+                        selected = workout.id in state.selectedWorkoutIds,
+                        selectionMode = state.isSelectionMode,
+                        activeSessionId = state.activeSessionId,
+                        onClick = {
+                            if (state.isSelectionMode) {
+                                onToggleWorkoutSelection(workout.id)
+                            }
+                        },
+                        onLongClick = { onSelectWorkout(workout.id) },
+                        onEditWorkout = onEditWorkout,
+                        onStartWorkout = onStartWorkout,
+                        onResumeWorkout = onResumeWorkout,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun WorkoutRow(
+    workout: WorkoutListItem,
+    selected: Boolean,
+    selectionMode: Boolean,
+    activeSessionId: Long?,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    onEditWorkout: (Long) -> Unit,
+    onStartWorkout: (Long) -> Unit,
+    onResumeWorkout: (Long) -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .testTag("workout-row-${workout.id}")
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+            ),
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            if (selectionMode) {
+                Checkbox(
+                    checked = selected,
+                    modifier = Modifier.testTag("workout-checkbox-${workout.id}"),
+                    onCheckedChange = { onClick() },
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = workout.name,
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                Text(
+                    text = "${workout.circuitCount} circuits | ${workout.exerciseCount} exercises",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                if (!selectionMode) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Text(
-                                text = workout.name,
-                                style = MaterialTheme.typography.titleLarge,
-                            )
-                            Text(
-                                text = "${workout.circuitCount} circuits | ${workout.exerciseCount} exercises",
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
+                        IconButton(onClick = { onEditWorkout(workout.id) }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Edit")
+                        }
+                        if (activeSessionId != null) {
+                            TextButton(
+                                onClick = { onResumeWorkout(activeSessionId) },
+                                modifier = Modifier.testTag("resume-workout"),
                             ) {
-                                Row {
-                                    IconButton(onClick = { onEditWorkout(workout.id) }) {
-                                        Icon(Icons.Default.Edit, contentDescription = "Edit")
-                                    }
-                                    IconButton(onClick = { onDeleteWorkout(workout) }) {
-                                        Icon(Icons.Default.Delete, contentDescription = "Delete")
-                                    }
-                                }
-                                if (state.activeSessionId != null) {
-                                    TextButton(
-                                        onClick = { onResumeWorkout(state.activeSessionId) },
-                                        modifier = Modifier.testTag("resume-workout"),
-                                    ) {
-                                        Icon(Icons.Default.PlayArrow, contentDescription = null)
-                                        Text("Resume")
-                                    }
-                                } else {
-                                    TextButton(
-                                        onClick = { onStartWorkout(workout.id) },
-                                        modifier = Modifier.testTag("start-workout-${workout.id}"),
-                                    ) {
-                                        Icon(Icons.Default.PlayArrow, contentDescription = null)
-                                        Text("Start")
-                                    }
-                                }
+                                Icon(Icons.Default.PlayArrow, contentDescription = null)
+                                Text("Resume")
+                            }
+                        } else {
+                            TextButton(
+                                onClick = { onStartWorkout(workout.id) },
+                                modifier = Modifier.testTag("start-workout-${workout.id}"),
+                            ) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = null)
+                                Text("Start")
                             }
                         }
                     }

@@ -6,6 +6,9 @@ import dev.wwade.workout.domain.model.WorkoutListItem
 data class WorkoutListState(
     val workouts: List<WorkoutListItem> = emptyList(),
     val activeSessionId: Long? = null,
+    val selectedWorkoutIds: Set<Long> = emptySet(),
+    val isSelectionMode: Boolean = false,
+    val pendingDeleteCount: Int = 0,
     val isImporting: Boolean = false,
     val isExporting: Boolean = false,
     val importDialog: WorkoutImportDialog = WorkoutImportDialog.None,

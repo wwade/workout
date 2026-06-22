@@ -54,7 +54,12 @@ fun WorkoutNavHost(
                 state = state,
                 onCreateWorkout = { navController.navigate("editor") },
                 onEditWorkout = { workoutId -> navController.navigate("editor?workoutId=$workoutId") },
-                onDeleteWorkout = viewModel::deleteWorkout,
+                onSelectWorkout = viewModel::selectWorkout,
+                onToggleWorkoutSelection = viewModel::toggleWorkoutSelection,
+                onClearSelection = viewModel::clearSelection,
+                onRequestDeleteSelected = viewModel::requestDeleteSelected,
+                onCancelDelete = viewModel::cancelDelete,
+                onConfirmDelete = viewModel::confirmDelete,
                 onStartWorkout = { workoutId ->
                     scope.launch {
                         val sessionId = viewModel.startWorkout(workoutId)

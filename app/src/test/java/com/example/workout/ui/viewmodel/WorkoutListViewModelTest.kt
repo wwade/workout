@@ -244,6 +244,99 @@ class WorkoutListViewModelTest {
         collector.cancel()
     }
 
+    @Test
+    fun selectToggleAndClearSelectionUpdatesState() = runTest {
+        val repository = FakeWorkoutRepository()
+        repository.setWorkouts(listOf(workoutItem(1), workoutItem(2)))
+        val viewModel = viewModel(repository)
+        val collector = backgroundScope.launch {
+            viewModel.state.collectLatest { }
+        }
+
+        viewModel.selectWorkout(1)
+        viewModel.toggleWorkoutSelection(2)
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.selectedWorkoutIds).containsExactly(1L, 2L)
+        assertThat(viewModel.state.value.isSelectionMode).isTrue()
+
+        viewModel.toggleWorkoutSelection(1)
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.selectedWorkoutIds).containsExactly(2L)
+
+        viewModel.clearSelection()
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.selectedWorkoutIds).isEmpty()
+        assertThat(viewModel.state.value.isSelectionMode).isFalse()
+        collector.cancel()
+    }
+
+    @Test
+    fun confirmDeleteCallsRepositoryAndClearsSelection() = runTest {
+        val repository = FakeWorkoutRepository()
+        repository.setWorkouts(listOf(workoutItem(1), workoutItem(2)))
+        val viewModel = viewModel(repository)
+        val collector = backgroundScope.launch {
+            viewModel.state.collectLatest { }
+        }
+
+        viewModel.selectWorkout(1)
+        viewModel.selectWorkout(2)
+        viewModel.requestDeleteSelected()
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.pendingDeleteCount).isEqualTo(2)
+
+        viewModel.confirmDelete()
+        advanceUntilIdle()
+
+        assertThat(repository.deletedWorkoutIds).containsExactly(1L, 2L).inOrder()
+        assertThat(viewModel.state.value.selectedWorkoutIds).isEmpty()
+        assertThat(viewModel.state.value.pendingDeleteCount).isEqualTo(0)
+        collector.cancel()
+    }
+
+    @Test
+    fun cancelDeleteKeepsSelection() = runTest {
+        val repository = FakeWorkoutRepository()
+        repository.setWorkouts(listOf(workoutItem(1)))
+        val viewModel = viewModel(repository)
+        val collector = backgroundScope.launch {
+            viewModel.state.collectLatest { }
+        }
+
+        viewModel.selectWorkout(1)
+        viewModel.requestDeleteSelected()
+        viewModel.cancelDelete()
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.selectedWorkoutIds).containsExactly(1L)
+        assertThat(viewModel.state.value.pendingDeleteCount).isEqualTo(0)
+        collector.cancel()
+    }
+
+    @Test
+    fun staleSelectedWorkoutsAreRemovedWhenWorkoutListChanges() = runTest {
+        val repository = FakeWorkoutRepository()
+        repository.setWorkouts(listOf(workoutItem(1), workoutItem(2)))
+        val viewModel = viewModel(repository)
+        val collector = backgroundScope.launch {
+            viewModel.state.collectLatest { }
+        }
+
+        viewModel.selectWorkout(1)
+        viewModel.selectWorkout(2)
+        advanceUntilIdle()
+
+        repository.setWorkouts(listOf(workoutItem(2)))
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.selectedWorkoutIds).containsExactly(2L)
+        collector.cancel()
+    }
+
     private fun viewModel(
         repository: FakeWorkoutRepository,
         fetcher: WorkoutImportJsonFetcher = object : WorkoutImportJsonFetcher {
@@ -284,9 +377,14 @@ private class FakeWorkoutDataImportRepository : WorkoutDataImportRepository {
 
 private class FakeWorkoutRepository : WorkoutRepository {
     val savedWorkouts = mutableListOf<WorkoutDraft>()
+    val deletedWorkoutIds = mutableListOf<Long>()
     private val workouts = MutableStateFlow<List<WorkoutListItem>>(emptyList())
 
     override fun observeWorkouts(): Flow<List<WorkoutListItem>> = workouts
+
+    fun setWorkouts(items: List<WorkoutListItem>) {
+        workouts.value = items
+    }
 
     override suspend fun getWorkout(workoutId: Long): WorkoutTemplate? = null
 
@@ -295,7 +393,19 @@ private class FakeWorkoutRepository : WorkoutRepository {
         return savedWorkouts.size.toLong()
     }
 
-    override suspend fun deleteWorkout(workoutId: Long) = Unit
+    override suspend fun deleteWorkout(workoutId: Long) {
+        deletedWorkoutIds += workoutId
+    }
+}
+
+private fun workoutItem(id: Long): WorkoutListItem {
+    return WorkoutListItem(
+        id = id,
+        name = "Workout $id",
+        circuitCount = 1,
+        exerciseCount = 2,
+        updatedAt = id,
+    )
 }
 
 private class FakeWorkoutListSessionRepository : SessionRepository {

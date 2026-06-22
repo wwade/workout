@@ -8,7 +8,6 @@ import dev.wwade.workout.domain.importer.WorkoutImportException
 import dev.wwade.workout.domain.importer.WorkoutImportRequest
 import dev.wwade.workout.domain.importer.WorkoutImportResult
 import dev.wwade.workout.domain.importer.WorkoutImportSource
-import dev.wwade.workout.domain.model.WorkoutListItem
 import dev.wwade.workout.domain.repository.SessionRepository
 import dev.wwade.workout.domain.repository.WorkoutRepository
 import dev.wwade.workout.domain.usecase.StartWorkoutUseCase
@@ -23,6 +22,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -36,15 +36,27 @@ class WorkoutListViewModel(
 ) : ViewModel() {
     private val startWorkoutUseCase = StartWorkoutUseCase(sessionRepository)
     private val importState = MutableStateFlow(WorkoutListImportState())
+    private val selectedWorkoutIds = MutableStateFlow<Set<Long>>(emptySet())
+    private val pendingDeleteCount = MutableStateFlow(0)
+    private val workouts = workoutRepository.observeWorkouts()
+        .onEach { workouts ->
+            val visibleWorkoutIds = workouts.map { it.id }.toSet()
+            selectedWorkoutIds.update { selected -> selected.intersect(visibleWorkoutIds) }
+        }
 
     val state: StateFlow<WorkoutListState> = combine(
-        workoutRepository.observeWorkouts(),
+        workouts,
         sessionRepository.observeActiveSessionId(),
         importState,
-    ) { workouts, activeSessionId, importState ->
+        selectedWorkoutIds,
+        pendingDeleteCount,
+    ) { workouts, activeSessionId, importState, selectedIds, deleteCount ->
         WorkoutListState(
             workouts = workouts,
             activeSessionId = activeSessionId,
+            selectedWorkoutIds = selectedIds,
+            isSelectionMode = selectedIds.isNotEmpty(),
+            pendingDeleteCount = deleteCount,
             isImporting = importState.isImporting,
             isExporting = importState.isExporting,
             importDialog = importState.importDialog,
@@ -57,9 +69,45 @@ class WorkoutListViewModel(
         initialValue = WorkoutListState(),
     )
 
-    fun deleteWorkout(workout: WorkoutListItem) {
+    fun selectWorkout(workoutId: Long) {
+        selectedWorkoutIds.update { it + workoutId }
+    }
+
+    fun toggleWorkoutSelection(workoutId: Long) {
+        selectedWorkoutIds.update { selected ->
+            if (workoutId in selected) selected - workoutId else selected + workoutId
+        }
+    }
+
+    fun clearSelection() {
+        selectedWorkoutIds.value = emptySet()
+        pendingDeleteCount.value = 0
+    }
+
+    fun requestDeleteSelected() {
+        val count = selectedWorkoutIds.value.size
+        if (count > 0) {
+            pendingDeleteCount.value = count
+        }
+    }
+
+    fun cancelDelete() {
+        pendingDeleteCount.value = 0
+    }
+
+    fun confirmDelete() {
+        val workoutIds = selectedWorkoutIds.value
+        if (workoutIds.isEmpty()) {
+            pendingDeleteCount.value = 0
+            return
+        }
+
         viewModelScope.launch {
-            workoutRepository.deleteWorkout(workout.id)
+            workoutIds.forEach { workoutId ->
+                workoutRepository.deleteWorkout(workoutId)
+            }
+            selectedWorkoutIds.value = emptySet()
+            pendingDeleteCount.value = 0
         }
     }
 
