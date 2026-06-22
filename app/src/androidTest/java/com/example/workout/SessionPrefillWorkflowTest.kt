@@ -6,6 +6,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.wwade.workout.data.db.AppDatabase
+import dev.wwade.workout.data.db.MIGRATION_3_4
 import dev.wwade.workout.data.repository.RoomSessionRepository
 import dev.wwade.workout.data.repository.RoomWorkoutRepository
 import dev.wwade.workout.domain.model.CircuitDraft
@@ -162,13 +163,18 @@ class SessionPrefillWorkflowTest {
         assertThat(newCircuitAExercises.map { it.exerciseDefinitionId }).doesNotContain(null)
 
         val legacySessionId = seedLegacyCompletedDay2CircuitAHistory()
+        MIGRATION_3_4.migrate(database.openHelper.writableDatabase)
         val legacyCircuitAExercises = sessionRepository.getSessionDetail(legacySessionId)!!
             .circuits
             .single { it.name == "Circuit A" }
             .exercises
             .sortedBy { it.sortOrder }
 
-        assertThat(legacyCircuitAExercises.map { it.exerciseDefinitionId }).containsExactly(null, null, null)
+        assertThat(legacyCircuitAExercises.map { it.exerciseDefinitionId }).containsExactly(
+            newCircuitAExercises[0].exerciseDefinitionId,
+            newCircuitAExercises[1].exerciseDefinitionId,
+            newCircuitAExercises[2].exerciseDefinitionId,
+        ).inOrder()
         assertThat(legacyCircuitAExercises.map { exercise -> exercise.sets.map { it.repsActual } }).containsExactly(
             listOf(11, 12),
             listOf(10, 10),

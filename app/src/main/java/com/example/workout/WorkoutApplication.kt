@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.room.Room
 import dev.wwade.workout.data.db.AppDatabase
 import dev.wwade.workout.data.db.MIGRATION_2_3
+import dev.wwade.workout.data.db.MIGRATION_3_4
 import dev.wwade.workout.data.repository.RoomExerciseDefinitionRepository
 import dev.wwade.workout.data.repository.RoomWorkoutDataExportRepository
 import dev.wwade.workout.data.repository.RoomSessionRepository
@@ -44,8 +45,8 @@ private class DefaultAppContainer(
         application,
         AppDatabase::class.java,
         "workout-tracker.db",
-    ).addMigrations(MIGRATION_2_3)
-        .fallbackToDestructiveMigration()
+    ).addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+        .fallbackToDestructiveMigration(true)
         .build()
 
     override val exerciseDefinitionRepository: ExerciseDefinitionRepository = RoomExerciseDefinitionRepository(

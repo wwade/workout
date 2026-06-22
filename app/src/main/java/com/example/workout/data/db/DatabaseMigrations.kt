@@ -115,6 +115,74 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
             WHERE exerciseTemplateId IS NOT NULL
             """.trimIndent(),
         )
+        backfillMissingSessionDefinitionIds(db, now)
         db.execSQL("CREATE INDEX IF NOT EXISTS index_exercise_sessions_exerciseDefinitionId ON exercise_sessions(exerciseDefinitionId)")
+    }
+}
+
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        backfillMissingSessionDefinitionIds(db, System.currentTimeMillis())
+    }
+}
+
+private fun backfillMissingSessionDefinitionIds(db: SupportSQLiteDatabase, now: Long) {
+    val definitionIds = mutableMapOf<String, Long>()
+    db.query("SELECT id, normalizedName FROM exercise_definitions").use { cursor ->
+        while (cursor.moveToNext()) {
+            definitionIds[cursor.getString(cursor.getColumnIndexOrThrow("normalizedName"))] =
+                cursor.getLong(cursor.getColumnIndexOrThrow("id"))
+        }
+    }
+
+    data class MissingSessionDefinition(
+        val sessionExerciseId: Long,
+        val name: String,
+        val guidance: String,
+    )
+
+    val missingDefinitions = mutableListOf<MissingSessionDefinition>()
+    db.query(
+        """
+        SELECT id, exerciseNameSnapshot, guidanceSnapshot
+        FROM exercise_sessions
+        WHERE exerciseDefinitionId IS NULL
+        ORDER BY id ASC
+        """.trimIndent(),
+    ).use { cursor ->
+        while (cursor.moveToNext()) {
+            missingDefinitions += MissingSessionDefinition(
+                sessionExerciseId = cursor.getLong(cursor.getColumnIndexOrThrow("id")),
+                name = cursor.getString(cursor.getColumnIndexOrThrow("exerciseNameSnapshot")),
+                guidance = cursor.getString(cursor.getColumnIndexOrThrow("guidanceSnapshot")),
+            )
+        }
+    }
+
+    missingDefinitions.forEach { missingDefinition ->
+        val normalizedName = normalizeExerciseName(missingDefinition.name)
+        val definitionId = definitionIds.getOrPut(normalizedName) {
+            db.execSQL(
+                """
+                INSERT INTO exercise_definitions(name, normalizedName, defaultGuidance, archived, createdAt, updatedAt)
+                VALUES (?, ?, ?, 0, ?, ?)
+                """.trimIndent(),
+                arrayOf<Any>(
+                    missingDefinition.name.trim(),
+                    normalizedName,
+                    missingDefinition.guidance.trim(),
+                    now,
+                    now,
+                ),
+            )
+            db.query("SELECT last_insert_rowid()").use { cursor ->
+                cursor.moveToFirst()
+                cursor.getLong(0)
+            }
+        }
+        db.execSQL(
+            "UPDATE exercise_sessions SET exerciseDefinitionId = ? WHERE id = ?",
+            arrayOf<Any>(definitionId, missingDefinition.sessionExerciseId),
+        )
     }
 }

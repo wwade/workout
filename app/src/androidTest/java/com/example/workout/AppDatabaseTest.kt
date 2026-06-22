@@ -9,6 +9,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.wwade.workout.data.db.AppDatabase
 import dev.wwade.workout.data.db.MIGRATION_2_3
+import dev.wwade.workout.data.db.MIGRATION_3_4
 import dev.wwade.workout.data.db.SetEntryEntity
 import dev.wwade.workout.domain.model.CircuitDraft
 import dev.wwade.workout.domain.model.ExerciseDraft
@@ -218,6 +219,42 @@ class AppDatabaseTest {
         migrated.close()
     }
 
+    @Test
+    fun migration3To4BackfillsMissingSessionDefinitionIdsFromSnapshots() {
+        val dbName = "migration-3-4"
+        migrationHelper.createDatabase(dbName, 3).apply {
+            seedVersion3WorkoutAndLegacySessions()
+            close()
+        }
+
+        val migrated = migrationHelper.runMigrationsAndValidate(dbName, 4, true, MIGRATION_3_4)
+
+        migrated.query(
+            """
+            SELECT es.exerciseNameSnapshot, ed.name, ed.normalizedName, se.repsActual
+            FROM exercise_sessions es
+            INNER JOIN exercise_definitions ed ON ed.id = es.exerciseDefinitionId
+            INNER JOIN set_entries se ON se.exerciseSessionId = es.id
+            ORDER BY es.sortOrder ASC
+            """.trimIndent(),
+        ).use { cursor ->
+            assertThat(cursor.count).isEqualTo(2)
+
+            cursor.moveToFirst()
+            assertThat(cursor.getString(0)).isEqualTo(" HINGE - Glute Bridge Marching ")
+            assertThat(cursor.getString(1)).isEqualTo("Hinge - Glute Bridge Marching")
+            assertThat(cursor.getString(2)).isEqualTo("hinge - glute bridge marching")
+            assertThat(cursor.getInt(3)).isEqualTo(11)
+
+            cursor.moveToNext()
+            assertThat(cursor.getString(0)).isEqualTo("Legacy Curl")
+            assertThat(cursor.getString(1)).isEqualTo("Legacy Curl")
+            assertThat(cursor.getString(2)).isEqualTo("legacy curl")
+            assertThat(cursor.getInt(3)).isEqualTo(12)
+        }
+        migrated.close()
+    }
+
     private fun SupportSQLiteDatabase.seedVersion2WorkoutAndSession() {
         execSQL("INSERT INTO workout_templates(id, name, sortOrder, createdAt, updatedAt) VALUES (1, 'A', 0, 1, 1)")
         execSQL("INSERT INTO workout_templates(id, name, sortOrder, createdAt, updatedAt) VALUES (2, 'B', 1, 1, 1)")
@@ -256,6 +293,55 @@ class AppDatabaseTest {
         )
         execSQL(
             "INSERT INTO set_entries(id, exerciseSessionId, setIndex, repsActual, loadActual, notes, skipped) VALUES (1003, 1002, 0, 8, 15.0, 'ok', 0)",
+        )
+    }
+
+    private fun SupportSQLiteDatabase.seedVersion3WorkoutAndLegacySessions() {
+        execSQL(
+            """
+            INSERT INTO exercise_definitions(id, name, normalizedName, defaultGuidance, archived, createdAt, updatedAt)
+            VALUES (1, 'Hinge - Glute Bridge Marching', 'hinge - glute bridge marching', 'Existing guidance', 0, 1, 1)
+            """.trimIndent(),
+        )
+        execSQL("INSERT INTO workout_templates(id, name, sortOrder, createdAt, updatedAt) VALUES (1, 'Day 2', 0, 1, 1)")
+        execSQL("INSERT INTO circuit_templates(id, workoutId, name, sortOrder) VALUES (10, 1, 'Circuit A', 0)")
+        execSQL(
+            """
+            INSERT INTO exercise_templates(
+                id, circuitId, exerciseDefinitionId, guidance, repMin, repMax, loadKind, loadMin, loadMax,
+                loadUnit, restTimeSeconds, setCount, sortOrder
+            ) VALUES (100, 10, 1, 'Existing guidance', 10, 15, 'WEIGHT', 0.0, 0.0, 'LB', 15, 2, 0)
+            """.trimIndent(),
+        )
+        execSQL(
+            "INSERT INTO workout_sessions(id, workoutTemplateId, workoutNameSnapshot, startedAt, completedAt, status) VALUES (1000, 1, 'Day 2', 1, 2, 'COMPLETED')",
+        )
+        execSQL(
+            "INSERT INTO circuit_sessions(id, workoutSessionId, circuitTemplateId, circuitNameSnapshot, sortOrder, setCount) VALUES (1001, 1000, 10, 'Circuit A', 0, 2)",
+        )
+        execSQL(
+            """
+            INSERT INTO exercise_sessions(
+                id, circuitSessionId, exerciseTemplateId, exerciseDefinitionId, exerciseNameSnapshot, guidanceSnapshot,
+                repMinSnapshot, repMaxSnapshot, loadKindSnapshot, loadMinSnapshot, loadMaxSnapshot,
+                loadUnitSnapshot, restTimeSecondsSnapshot, sortOrder
+            ) VALUES (1002, 1001, 999, NULL, ' HINGE - Glute Bridge Marching ', 'Snapshot guidance', 10, 15, 'WEIGHT', 0.0, 0.0, 'LB', 15, 0)
+            """.trimIndent(),
+        )
+        execSQL(
+            """
+            INSERT INTO exercise_sessions(
+                id, circuitSessionId, exerciseTemplateId, exerciseDefinitionId, exerciseNameSnapshot, guidanceSnapshot,
+                repMinSnapshot, repMaxSnapshot, loadKindSnapshot, loadMinSnapshot, loadMaxSnapshot,
+                loadUnitSnapshot, restTimeSecondsSnapshot, sortOrder
+            ) VALUES (1003, 1001, NULL, NULL, 'Legacy Curl', 'Curl guidance', 8, 12, 'WEIGHT', 5.0, 10.0, 'LB', 30, 1)
+            """.trimIndent(),
+        )
+        execSQL(
+            "INSERT INTO set_entries(id, exerciseSessionId, setIndex, repsActual, loadActual, notes, skipped) VALUES (1004, 1002, 0, 11, 0.0, 'ok', 0)",
+        )
+        execSQL(
+            "INSERT INTO set_entries(id, exerciseSessionId, setIndex, repsActual, loadActual, notes, skipped) VALUES (1005, 1003, 0, 12, 5.0, 'ok', 0)",
         )
     }
 
