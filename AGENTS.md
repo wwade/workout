@@ -9,18 +9,20 @@ When running Gradle from Codex on Windows, use the JDK bundled with Android Stud
 - `JAVA_HOME=C:\Program Files\Android\Android Studio\jbr`
 - prepend `%JAVA_HOME%\bin` to `PATH`
 
-Use a project-local Gradle home so wrapper and dependency downloads stay reusable inside the workspace:
+Use the default user Gradle home shared with Android Studio so Codex can reuse the same wrapper downloads, dependency cache, and compatible running Gradle daemons:
 
-- `GRADLE_USER_HOME=<project-root>\.gradle-user`
+- Leave `GRADLE_USER_HOME` unset so Gradle uses the default user Gradle home (typically `%USERPROFILE%\.gradle` on Windows)
 
 PowerShell pattern:
 
 ```powershell
 $env:JAVA_HOME='C:\Program Files\Android\Android Studio\jbr'
 $env:Path="$env:JAVA_HOME\bin;$env:Path"
-$env:GRADLE_USER_HOME=(Join-Path $PWD '.gradle-user')
+Remove-Item Env:\GRADLE_USER_HOME -ErrorAction SilentlyContinue
 .\gradlew.bat assembleDebug
 ```
+
+Matching Android Studio's JDK, Gradle version, daemon options, and default Gradle home lets Gradle attach to the shared daemon when compatible.
 
 ## Known Good Commands
 
@@ -51,7 +53,7 @@ To capture logs for inspection:
 
 - If Gradle fails with `JAVA_HOME is not set`, use the setup above before retrying.
 - First-time wrapper or dependency downloads may require network access.
-- If the project-local Gradle cache has a Windows file lock, use a second project-local cache such as `.gradle-user-import` and keep it ignored.
+- If the shared Gradle cache has a Windows file lock, use a temporary project-local cache such as `.gradle-user-import` and keep it ignored.
 - Gradle can emit structured warnings into `build/reports/problems/problems-report.html` even when stdout is quiet.
 - Package ids by build type are `dev.wwade.workout` for release, `dev.wwade.workout.debug` for debug, and `dev.wwade.workout.e2e` for the dedicated e2e app install.
 - Instrumentation tests are exposed by the debug Android test task (`app:connectedDebugAndroidTest`). This Gradle project does not currently define an e2e-specific connected Android test task.
