@@ -89,7 +89,7 @@ workouts:
 
 A single workout object with `name` and `circuits` is also accepted as a convenience in either JSON or YAML. Import validation uses the same rules as the workout editor.
 
-Full JSON backups exported by the app can also be imported from the same Import action. A full backup import is a restore: it replaces current workout data, including workout templates, exercise definitions, active sessions, completed sessions, snapshots, and set entries. Full backup import supports the JSON export schema only.
+Full JSON backups exported by the app can also be imported from the same Import action. A full backup import is a restore: it replaces current workout data, including workout templates, exercise definitions, active sessions, completed sessions, snapshots, and set entries. Full backup import supports the current JSON export schema and legacy schema version 1 backups; legacy imports derive missing exercise definitions from template and session snapshots.
 
 ## Exporting Data
 
@@ -102,7 +102,7 @@ Exports include:
 - active, abandoned, and completed workout sessions
 - session snapshots and set entries
 
-The current export schema is JSON-only, uses top-level `schemaVersion: 2`, and includes canonical exercise ids so shared exercise history can be reconstructed.
+The current export schema is JSON-only, uses top-level `schemaVersion: 2`, and includes canonical exercise ids so shared exercise history can be reconstructed. The importer also accepts legacy `schemaVersion: 1` backups that were exported before canonical exercise ids were added. Early `schemaVersion: 2` backups with missing historical session exercise ids are repaired during import by matching session snapshots to canonical exercise names.
 
 ## Data Model
 

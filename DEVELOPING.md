@@ -98,7 +98,7 @@ Workout import is implemented as a domain-level importer plus a workout-list UI 
 
 - `ImportWorkoutsUseCase` coordinates fetching/parsing, validation, and saving.
 - `WorkoutImportParser` accepts JSON or YAML, either as `{"workouts":[...]}` / `workouts: [...]` or one single workout object.
-- Full JSON backups are detected by top-level `schemaVersion`; supported full backups use export `schemaVersion` `2`.
+- Full JSON backups are detected by top-level `schemaVersion`; supported full backups use export `schemaVersion` `1` or `2`.
 - `RoomWorkoutDataImportRepository` restores full backups in one replace-all Room transaction with preserved ids.
 - URL imports use `HttpURLConnection` and require `android.permission.INTERNET`.
 - Local file imports use `ActivityResultContracts.OpenDocument` and read the selected `Uri` once through `ContentResolver`.
@@ -106,7 +106,7 @@ Workout import is implemented as a domain-level importer plus a workout-list UI 
 
 The import schema maps to workout drafts, then save-time resolution creates or reuses exercise definitions. JSON and YAML use the same field names. Required structural fields are workout `circuits` and circuit `exercises`; exercise fields otherwise fall back to the same defaults as `ExerciseDraft` where possible. Exercise name matching trims, collapses whitespace, and compares case-insensitively.
 
-Full backup import is JSON-only and is the inverse of full export. It clears workout/session/exercise data, then restores exercise definitions, templates, sessions, snapshot rows, and set entries from the backup.
+Full backup import is JSON-only and is the inverse of full export. It clears workout/session/exercise data, then restores exercise definitions, templates, sessions, snapshot rows, and set entries from the backup. Schema version 1 backups predate exercise definitions, so the parser derives missing definitions from exported template and session snapshots before Room restore. Early schema version 2 backups can contain null historical session `exerciseDefinitionId` values; the parser backfills them from the referenced template when present, then by normalized session snapshot name.
 
 ## Export Notes
 
@@ -116,7 +116,7 @@ Full data export is implemented as a separate domain-level exporter plus a worko
 - Export DTOs live under `domain/exporter` and stay separate from Room entities and domain models.
 - Local export uses `ActivityResultContracts.CreateDocument` and writes the selected `Uri` once through `ContentResolver`.
 - The current export schema is JSON-only and includes exercise definitions, templates, sessions, snapshot rows, and set entries.
-- Export `schemaVersion` is `2`; exercise template and session exercise rows include `exerciseDefinitionId`.
+- Export `schemaVersion` is `2`; exercise template and session exercise rows include `exerciseDefinitionId`. Older `schemaVersion` `1` exports did not include those fields and are handled by the import compatibility path.
 
 ## Persistence Notes
 

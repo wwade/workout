@@ -5,6 +5,7 @@ import dev.wwade.workout.domain.model.ExerciseDraft
 import dev.wwade.workout.domain.model.LoadKind
 import dev.wwade.workout.domain.model.LoadUnit
 import dev.wwade.workout.domain.model.WorkoutDraft
+import dev.wwade.workout.domain.repository.normalizeExerciseName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -113,9 +114,17 @@ class WorkoutImportParser {
     ): WorkoutDataRestoreSnapshot {
         val schemaVersion = root["schemaVersion"]?.jsonPrimitive?.intOrNull
             ?: throw WorkoutImportException("Workout data backup JSON is missing schemaVersion.")
-        if (schemaVersion != 2) {
-            throw WorkoutImportException("Unsupported workout data backup schemaVersion $schemaVersion.")
+
+        return when (schemaVersion) {
+            1 -> parseLegacyFullBackup(root)
+            2 -> parseCurrentFullBackup(root)
+            else -> throw WorkoutImportException("Unsupported workout data backup schemaVersion $schemaVersion.")
         }
+    }
+
+    private fun parseCurrentFullBackup(
+        root: kotlinx.serialization.json.JsonObject,
+    ): WorkoutDataRestoreSnapshot {
         val requiredCollections = listOf("exerciseDefinitions", "workouts", "sessions")
         val missingCollection = requiredCollections.firstOrNull { !root.containsKey(it) }
         if (missingCollection != null) {
@@ -124,6 +133,30 @@ class WorkoutImportParser {
 
         val dto = runCatching {
             json.decodeFromJsonElement<WorkoutDataImportDto>(root)
+        }.getOrElse { error ->
+            val message = when (error) {
+                is SerializationException -> "Workout data backup JSON does not match the export schema."
+                else -> "Unable to read the workout data backup JSON."
+            }
+            throw WorkoutImportException(message, error)
+        }
+
+        return dto.toSnapshot()
+            .withBackfilledSessionExerciseDefinitions(dto.exportedAt)
+            .also { it.validate() }
+    }
+
+    private fun parseLegacyFullBackup(
+        root: kotlinx.serialization.json.JsonObject,
+    ): WorkoutDataRestoreSnapshot {
+        val requiredCollections = listOf("workouts", "sessions")
+        val missingCollection = requiredCollections.firstOrNull { !root.containsKey(it) }
+        if (missingCollection != null) {
+            throw WorkoutImportException("Workout data backup JSON is missing $missingCollection.")
+        }
+
+        val dto = runCatching {
+            json.decodeFromJsonElement<LegacyWorkoutDataImportDto>(root)
         }.getOrElse { error ->
             val message = when (error) {
                 is SerializationException -> "Workout data backup JSON does not match the export schema."
@@ -362,6 +395,262 @@ private data class WorkoutDataImportDto(
             sessions = sessions.map { it.toRow() },
         )
     }
+}
+
+private fun WorkoutDataRestoreSnapshot.withBackfilledSessionExerciseDefinitions(
+    timestamp: Long,
+): WorkoutDataRestoreSnapshot {
+    val templateDefinitionIds = workouts
+        .flatMap { workout -> workout.circuits }
+        .flatMap { circuit -> circuit.exercises }
+        .associate { exercise -> exercise.id to exercise.exerciseDefinitionId }
+
+    val definitionsByNormalizedName = linkedMapOf<String, ExerciseDefinitionRestoreRow>()
+    exerciseDefinitions.forEach { definition ->
+        definitionsByNormalizedName.putIfAbsent(normalizeExerciseName(definition.name), definition)
+    }
+    val addedDefinitions = mutableListOf<ExerciseDefinitionRestoreRow>()
+    var nextDefinitionId = (exerciseDefinitions.maxOfOrNull { it.id } ?: 0L) + 1L
+
+    fun definitionIdFor(exercise: ExerciseSessionRestoreRow): Long {
+        exercise.exerciseTemplateId?.let { exerciseTemplateId ->
+            templateDefinitionIds[exerciseTemplateId]?.let { return it }
+        }
+
+        val normalizedName = normalizeExerciseName(exercise.name)
+        definitionsByNormalizedName[normalizedName]?.let { return it.id }
+
+        val definition = ExerciseDefinitionRestoreRow(
+            id = nextDefinitionId++,
+            name = exercise.name.trim(),
+            defaultGuidance = exercise.guidance.trim(),
+            archived = false,
+            createdAt = timestamp,
+            updatedAt = timestamp,
+        )
+        definitionsByNormalizedName[normalizedName] = definition
+        addedDefinitions += definition
+        return definition.id
+    }
+
+    val backfilledSessions = sessions.map { session ->
+        session.copy(
+            circuits = session.circuits.map { circuit ->
+                circuit.copy(
+                    exercises = circuit.exercises.map { exercise ->
+                        if (exercise.exerciseDefinitionId != null) {
+                            exercise
+                        } else {
+                            exercise.copy(exerciseDefinitionId = definitionIdFor(exercise))
+                        }
+                    },
+                )
+            },
+        )
+    }
+
+    return copy(
+        exerciseDefinitions = exerciseDefinitions + addedDefinitions,
+        sessions = backfilledSessions,
+    )
+}
+
+@Serializable
+private data class LegacyWorkoutDataImportDto(
+    val schemaVersion: Int,
+    val exportedAt: Long,
+    val workouts: List<LegacyWorkoutTemplateImportDto>,
+    val sessions: List<LegacyWorkoutSessionImportDto>,
+) {
+    fun toSnapshot(): WorkoutDataRestoreSnapshot {
+        val definitions = LegacyExerciseDefinitionBuilder(exportedAt)
+        val workouts = workouts.map { it.toRow(definitions) }
+        val sessions = sessions.map { it.toRow(definitions) }
+        return WorkoutDataRestoreSnapshot(
+            exerciseDefinitions = definitions.rows(),
+            workouts = workouts,
+            sessions = sessions,
+        )
+    }
+}
+
+@Serializable
+private data class LegacyWorkoutTemplateImportDto(
+    val id: Long,
+    val name: String,
+    val sortOrder: Int,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val circuits: List<LegacyCircuitTemplateImportDto>,
+) {
+    fun toRow(definitions: LegacyExerciseDefinitionBuilder): WorkoutTemplateRestoreRow {
+        return WorkoutTemplateRestoreRow(
+            id = id,
+            name = name,
+            sortOrder = sortOrder,
+            createdAt = createdAt,
+            updatedAt = updatedAt,
+            circuits = circuits.map { it.toRow(definitions) },
+        )
+    }
+}
+
+@Serializable
+private data class LegacyCircuitTemplateImportDto(
+    val id: Long,
+    val workoutId: Long,
+    val name: String,
+    val sortOrder: Int,
+    val exercises: List<LegacyExerciseTemplateImportDto>,
+) {
+    fun toRow(definitions: LegacyExerciseDefinitionBuilder): CircuitTemplateRestoreRow {
+        return CircuitTemplateRestoreRow(
+            id = id,
+            workoutId = workoutId,
+            name = name,
+            sortOrder = sortOrder,
+            exercises = exercises.map { it.toRow(definitions) },
+        )
+    }
+}
+
+@Serializable
+private data class LegacyExerciseTemplateImportDto(
+    val id: Long,
+    val circuitId: Long,
+    val name: String,
+    val guidance: String,
+    val repMin: Int,
+    val repMax: Int,
+    val loadKind: LoadKind,
+    val loadMin: Double,
+    val loadMax: Double,
+    val loadUnit: LoadUnit,
+    val restTimeSeconds: Int,
+    val setCount: Int,
+    val sortOrder: Int,
+) {
+    fun toRow(definitions: LegacyExerciseDefinitionBuilder): ExerciseTemplateRestoreRow {
+        return ExerciseTemplateRestoreRow(
+            id = id,
+            circuitId = circuitId,
+            exerciseDefinitionId = definitions.idFor(name, guidance),
+            guidance = guidance,
+            repMin = repMin,
+            repMax = repMax,
+            loadKind = loadKind,
+            loadMin = loadMin,
+            loadMax = loadMax,
+            loadUnit = loadUnit,
+            restTimeSeconds = restTimeSeconds,
+            setCount = setCount,
+            sortOrder = sortOrder,
+        )
+    }
+}
+
+@Serializable
+private data class LegacyWorkoutSessionImportDto(
+    val sessionId: Long,
+    val workoutTemplateId: Long?,
+    val workoutName: String,
+    val startedAt: Long,
+    val completedAt: Long?,
+    val status: dev.wwade.workout.domain.model.SessionStatus,
+    val circuits: List<LegacyCircuitSessionImportDto>,
+) {
+    fun toRow(definitions: LegacyExerciseDefinitionBuilder): WorkoutSessionRestoreRow {
+        return WorkoutSessionRestoreRow(
+            sessionId = sessionId,
+            workoutTemplateId = workoutTemplateId,
+            workoutName = workoutName,
+            startedAt = startedAt,
+            completedAt = completedAt,
+            status = status,
+            circuits = circuits.map { it.toRow(definitions) },
+        )
+    }
+}
+
+@Serializable
+private data class LegacyCircuitSessionImportDto(
+    val circuitSessionId: Long,
+    val circuitTemplateId: Long?,
+    val name: String,
+    val sortOrder: Int,
+    val setCount: Int,
+    val exercises: List<LegacyExerciseSessionImportDto>,
+) {
+    fun toRow(definitions: LegacyExerciseDefinitionBuilder): CircuitSessionRestoreRow {
+        return CircuitSessionRestoreRow(
+            circuitSessionId = circuitSessionId,
+            circuitTemplateId = circuitTemplateId,
+            name = name,
+            sortOrder = sortOrder,
+            setCount = setCount,
+            exercises = exercises.map { it.toRow(definitions) },
+        )
+    }
+}
+
+@Serializable
+private data class LegacyExerciseSessionImportDto(
+    val exerciseSessionId: Long,
+    val exerciseTemplateId: Long?,
+    val name: String,
+    val guidance: String,
+    val repMin: Int,
+    val repMax: Int,
+    val loadKind: LoadKind,
+    val loadMin: Double,
+    val loadMax: Double,
+    val loadUnit: LoadUnit,
+    val restTimeSeconds: Int,
+    val sortOrder: Int,
+    val sets: List<SetEntryImportDto>,
+) {
+    fun toRow(definitions: LegacyExerciseDefinitionBuilder): ExerciseSessionRestoreRow {
+        return ExerciseSessionRestoreRow(
+            exerciseSessionId = exerciseSessionId,
+            exerciseTemplateId = exerciseTemplateId,
+            exerciseDefinitionId = definitions.idFor(name, guidance),
+            name = name,
+            guidance = guidance,
+            repMin = repMin,
+            repMax = repMax,
+            loadKind = loadKind,
+            loadMin = loadMin,
+            loadMax = loadMax,
+            loadUnit = loadUnit,
+            restTimeSeconds = restTimeSeconds,
+            sortOrder = sortOrder,
+            sets = sets.map { it.toRow() },
+        )
+    }
+}
+
+private class LegacyExerciseDefinitionBuilder(
+    private val timestamp: Long,
+) {
+    private val definitionsByName = linkedMapOf<String, ExerciseDefinitionRestoreRow>()
+
+    fun idFor(name: String, guidance: String): Long {
+        val normalizedName = normalizeExerciseName(name)
+        definitionsByName[normalizedName]?.let { return it.id }
+
+        val id = definitionsByName.size.toLong() + 1L
+        definitionsByName[normalizedName] = ExerciseDefinitionRestoreRow(
+            id = id,
+            name = name.trim(),
+            defaultGuidance = guidance.trim(),
+            archived = false,
+            createdAt = timestamp,
+            updatedAt = timestamp,
+        )
+        return id
+    }
+
+    fun rows(): List<ExerciseDefinitionRestoreRow> = definitionsByName.values.toList()
 }
 
 @Serializable

@@ -204,6 +204,68 @@ class AppDatabaseTest {
     }
 
     @Test
+    fun legacyFullBackupImportRestoresCompletedHistoryForDeletedTemplates() = runBlocking {
+        val useCase = ImportWorkoutsUseCase(
+            workoutRepository = RoomWorkoutRepository(database.workoutTemplateDao()),
+            importRepository = RoomWorkoutDataImportRepository(database),
+        )
+
+        val result = useCase(
+            WorkoutImportRequest(
+                WorkoutImportSource.RawJson(validLegacyWorkoutDataBackupJson()),
+            ),
+        )
+
+        assertThat(result.restoredCounts?.exerciseDefinitionCount).isEqualTo(2)
+        assertThat(result.restoredCounts?.workoutCount).isEqualTo(1)
+        assertThat(result.restoredCounts?.sessionCount).isEqualTo(1)
+
+        val sessions = database.workoutSessionDao().getAllSessionDetails()
+        assertThat(sessions.map { it.session.status }).containsExactly(SessionStatus.COMPLETED)
+        val session = sessions.single()
+        assertThat(session.session.workoutTemplateId).isEqualTo(99L)
+        assertThat(session.circuits.single().circuit.circuitTemplateId).isEqualTo(98L)
+        val exercise = session.circuits.single().exercises.single()
+        assertThat(exercise.exercise.exerciseTemplateId).isEqualTo(97L)
+        assertThat(exercise.exercise.exerciseDefinitionId).isEqualTo(2L)
+        assertThat(exercise.sets.single().notes).isEqualTo("Restored history")
+    }
+
+    @Test
+    fun fullBackupImportBackfillsMissingSessionDefinitionsForHistoryPrefill() = runBlocking {
+        val useCase = ImportWorkoutsUseCase(
+            workoutRepository = RoomWorkoutRepository(database.workoutTemplateDao()),
+            importRepository = RoomWorkoutDataImportRepository(database),
+        )
+        val backupJson = Regex(
+            """"exerciseTemplateId": 3,\s*"exerciseDefinitionId": 30,\s*"name": "Press",""",
+        ).replace(
+            validWorkoutDataBackupJson(),
+            """"exerciseTemplateId": 97,
+                      "exerciseDefinitionId": null,
+                      "name": " press ",""",
+        )
+
+        useCase(
+            WorkoutImportRequest(
+                WorkoutImportSource.RawJson(backupJson),
+            ),
+        )
+
+        val session = database.workoutSessionDao().getSessionDetail(11L)!!
+        val restoredExercise = session.circuits.single().exercises.single()
+        assertThat(restoredExercise.exercise.exerciseTemplateId).isEqualTo(97L)
+        assertThat(restoredExercise.exercise.exerciseDefinitionId).isEqualTo(30L)
+
+        val prefill = database.workoutSessionDao().getLatestCompletedSetEntry(
+            exerciseDefinitionId = 30L,
+            setIndex = 0,
+        )
+        assertThat(prefill?.repsActual).isEqualTo(7)
+        assertThat(prefill?.loadActual).isEqualTo(50.0)
+    }
+
+    @Test
     fun deleteCompletedSessionsRemovesSessionGraph() = runBlocking {
         val sessionId = createSession(status = SessionStatus.COMPLETED)
         val exerciseSessionId = database.workoutSessionDao()
@@ -510,6 +572,95 @@ private fun validWorkoutDataBackupJson(): String {
                           "repsActual": 7,
                           "loadActual": 50.0,
                           "notes": "Felt good",
+                          "skipped": false
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+    """.trimIndent()
+}
+
+private fun validLegacyWorkoutDataBackupJson(): String {
+    return """
+        {
+          "schemaVersion": 1,
+          "exportedAt": 1782000000000,
+          "workouts": [
+            {
+              "id": 1,
+              "name": "Push Day",
+              "sortOrder": 0,
+              "createdAt": 10,
+              "updatedAt": 20,
+              "circuits": [
+                {
+                  "id": 2,
+                  "workoutId": 1,
+                  "name": "Cycle 1",
+                  "sortOrder": 0,
+                  "exercises": [
+                    {
+                      "id": 3,
+                      "circuitId": 2,
+                      "name": "Press",
+                      "guidance": "Control the eccentric",
+                      "repMin": 6,
+                      "repMax": 8,
+                      "loadKind": "WEIGHT",
+                      "loadMin": 40.0,
+                      "loadMax": 60.0,
+                      "loadUnit": "LB",
+                      "restTimeSeconds": 90,
+                      "setCount": 3,
+                      "sortOrder": 0
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "sessions": [
+            {
+              "sessionId": 11,
+              "workoutTemplateId": 99,
+              "workoutName": "Deleted Pull Day",
+              "startedAt": 100,
+              "completedAt": 200,
+              "status": "COMPLETED",
+              "circuits": [
+                {
+                  "circuitSessionId": 12,
+                  "circuitTemplateId": 98,
+                  "name": "Deleted Cycle",
+                  "sortOrder": 0,
+                  "setCount": 1,
+                  "exercises": [
+                    {
+                      "exerciseSessionId": 13,
+                      "exerciseTemplateId": 97,
+                      "name": "Deleted Row",
+                      "guidance": "Snapshot guidance",
+                      "repMin": 8,
+                      "repMax": 12,
+                      "loadKind": "WEIGHT",
+                      "loadMin": 20.0,
+                      "loadMax": 40.0,
+                      "loadUnit": "LB",
+                      "restTimeSeconds": 60,
+                      "sortOrder": 0,
+                      "sets": [
+                        {
+                          "id": 14,
+                          "exerciseSessionId": 13,
+                          "setIndex": 0,
+                          "repsActual": 10,
+                          "loadActual": 35.0,
+                          "notes": "Restored history",
                           "skipped": false
                         }
                       ]

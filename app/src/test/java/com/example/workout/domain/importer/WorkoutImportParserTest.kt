@@ -150,6 +150,43 @@ class WorkoutImportParserTest {
     }
 
     @Test
+    fun parsesCurrentFullBackupAndBackfillsMissingSessionDefinitionIdsByName() {
+        val backupJson = Regex(
+            """"exerciseTemplateId": 3,\s*"exerciseDefinitionId": 30,\s*"name": "Press",""",
+        ).replace(
+            validWorkoutDataBackupJson(),
+            """"exerciseTemplateId": 97,
+                      "exerciseDefinitionId": null,
+                      "name": " press ",""",
+        )
+
+        val parsedImport = parser.parseImport(backupJson)
+
+        assertThat(parsedImport).isInstanceOf(ParsedWorkoutImport.FullBackup::class.java)
+        val snapshot = (parsedImport as ParsedWorkoutImport.FullBackup).snapshot
+        val sessionExercise = snapshot.sessions.single().circuits.single().exercises.single()
+        assertThat(snapshot.exerciseDefinitions.map { it.id }).containsExactly(30L)
+        assertThat(sessionExercise.exerciseTemplateId).isEqualTo(97L)
+        assertThat(sessionExercise.exerciseDefinitionId).isEqualTo(30L)
+    }
+
+    @Test
+    fun parsesLegacyFullBackupAndDerivesExerciseDefinitionsForHistory() {
+        val parsedImport = parser.parseImport(validLegacyWorkoutDataBackupJson())
+
+        assertThat(parsedImport).isInstanceOf(ParsedWorkoutImport.FullBackup::class.java)
+        val snapshot = (parsedImport as ParsedWorkoutImport.FullBackup).snapshot
+        assertThat(snapshot.exerciseDefinitions.map { it.name }).containsExactly("Press", "Deleted Row").inOrder()
+        assertThat(snapshot.workouts.single().circuits.single().exercises.single().exerciseDefinitionId)
+            .isEqualTo(1L)
+        val sessionExercise = snapshot.sessions.single().circuits.single().exercises.single()
+        assertThat(snapshot.sessions.single().workoutTemplateId).isEqualTo(99L)
+        assertThat(sessionExercise.exerciseTemplateId).isEqualTo(97L)
+        assertThat(sessionExercise.exerciseDefinitionId).isEqualTo(2L)
+        assertThat(sessionExercise.sets.single().notes).isEqualTo("Restored history")
+    }
+
+    @Test
     fun rejectsMalformedJson() {
         val error = runCatching { parser.parse("{not json") }.exceptionOrNull()
 
@@ -353,6 +390,95 @@ internal fun validWorkoutDataBackupJson(): String {
                           "repsActual": 7,
                           "loadActual": 50.0,
                           "notes": "Felt good",
+                          "skipped": false
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+    """.trimIndent()
+}
+
+internal fun validLegacyWorkoutDataBackupJson(): String {
+    return """
+        {
+          "schemaVersion": 1,
+          "exportedAt": 1782000000000,
+          "workouts": [
+            {
+              "id": 1,
+              "name": "Push Day",
+              "sortOrder": 0,
+              "createdAt": 10,
+              "updatedAt": 20,
+              "circuits": [
+                {
+                  "id": 2,
+                  "workoutId": 1,
+                  "name": "Cycle 1",
+                  "sortOrder": 0,
+                  "exercises": [
+                    {
+                      "id": 3,
+                      "circuitId": 2,
+                      "name": "Press",
+                      "guidance": "Control the eccentric",
+                      "repMin": 6,
+                      "repMax": 8,
+                      "loadKind": "WEIGHT",
+                      "loadMin": 40.0,
+                      "loadMax": 60.0,
+                      "loadUnit": "LB",
+                      "restTimeSeconds": 90,
+                      "setCount": 3,
+                      "sortOrder": 0
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "sessions": [
+            {
+              "sessionId": 11,
+              "workoutTemplateId": 99,
+              "workoutName": "Deleted Pull Day",
+              "startedAt": 100,
+              "completedAt": 200,
+              "status": "COMPLETED",
+              "circuits": [
+                {
+                  "circuitSessionId": 12,
+                  "circuitTemplateId": 98,
+                  "name": "Deleted Cycle",
+                  "sortOrder": 0,
+                  "setCount": 1,
+                  "exercises": [
+                    {
+                      "exerciseSessionId": 13,
+                      "exerciseTemplateId": 97,
+                      "name": "Deleted Row",
+                      "guidance": "Snapshot guidance",
+                      "repMin": 8,
+                      "repMax": 12,
+                      "loadKind": "WEIGHT",
+                      "loadMin": 20.0,
+                      "loadMax": 40.0,
+                      "loadUnit": "LB",
+                      "restTimeSeconds": 60,
+                      "sortOrder": 0,
+                      "sets": [
+                        {
+                          "id": 14,
+                          "exerciseSessionId": 13,
+                          "setIndex": 0,
+                          "repsActual": 10,
+                          "loadActual": 35.0,
+                          "notes": "Restored history",
                           "skipped": false
                         }
                       ]
