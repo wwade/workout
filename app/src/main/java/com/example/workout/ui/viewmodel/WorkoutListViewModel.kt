@@ -46,14 +46,14 @@ class WorkoutListViewModel(
 
     val state: StateFlow<WorkoutListState> = combine(
         workouts,
-        sessionRepository.observeActiveSessionId(),
+        sessionRepository.observeActiveSession(),
         importState,
         selectedWorkoutIds,
         pendingDeleteCount,
-    ) { workouts, activeSessionId, importState, selectedIds, deleteCount ->
+    ) { workouts, activeSession, importState, selectedIds, deleteCount ->
         WorkoutListState(
             workouts = workouts,
-            activeSessionId = activeSessionId,
+            activeSession = activeSession,
             selectedWorkoutIds = selectedIds,
             isSelectionMode = selectedIds.isNotEmpty(),
             pendingDeleteCount = deleteCount,

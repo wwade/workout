@@ -10,6 +10,7 @@ import dev.wwade.workout.domain.importer.WorkoutDataRestoreSnapshot
 import dev.wwade.workout.domain.importer.validWorkoutDataBackupJson
 import dev.wwade.workout.domain.importer.validSingleWorkoutJson
 import dev.wwade.workout.domain.importer.validSingleWorkoutYaml
+import dev.wwade.workout.domain.model.ActiveSessionSummary
 import dev.wwade.workout.domain.model.CircuitSessionDetail
 import dev.wwade.workout.domain.model.CircuitTemplate
 import dev.wwade.workout.domain.model.CompletedSessionListItem
@@ -337,8 +338,34 @@ class WorkoutListViewModelTest {
         collector.cancel()
     }
 
+    @Test
+    fun activeSessionSummaryIsIncludedInState() = runTest {
+        val repository = FakeWorkoutRepository()
+        val sessionRepository = FakeWorkoutListSessionRepository()
+        repository.setWorkouts(listOf(workoutItem(1), workoutItem(2)))
+        sessionRepository.activeSession.value = ActiveSessionSummary(
+            sessionId = 42,
+            workoutTemplateId = 2,
+            workoutName = "Workout 2",
+        )
+        val viewModel = viewModel(
+            repository = repository,
+            sessionRepository = sessionRepository,
+        )
+        val collector = backgroundScope.launch {
+            viewModel.state.collectLatest { }
+        }
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.activeSession?.sessionId).isEqualTo(42)
+        assertThat(viewModel.state.value.activeSession?.workoutTemplateId).isEqualTo(2)
+        assertThat(viewModel.state.value.activeSession?.workoutName).isEqualTo("Workout 2")
+        collector.cancel()
+    }
+
     private fun viewModel(
         repository: FakeWorkoutRepository,
+        sessionRepository: FakeWorkoutListSessionRepository = FakeWorkoutListSessionRepository(),
         fetcher: WorkoutImportJsonFetcher = object : WorkoutImportJsonFetcher {
             override suspend fun fetch(url: String): String = validSingleWorkoutJson("Remote")
         },
@@ -347,7 +374,7 @@ class WorkoutListViewModelTest {
     ): WorkoutListViewModel {
         return WorkoutListViewModel(
             workoutRepository = repository,
-            sessionRepository = FakeWorkoutListSessionRepository(),
+            sessionRepository = sessionRepository,
             importWorkoutsUseCase = ImportWorkoutsUseCase(
                 workoutRepository = repository,
                 importRepository = importRepository,
@@ -409,7 +436,9 @@ private fun workoutItem(id: Long): WorkoutListItem {
 }
 
 private class FakeWorkoutListSessionRepository : SessionRepository {
-    override fun observeActiveSessionId(): Flow<Long?> = flowOf(null)
+    val activeSession = MutableStateFlow<ActiveSessionSummary?>(null)
+
+    override fun observeActiveSession(): Flow<ActiveSessionSummary?> = activeSession
 
     override suspend fun startWorkout(workoutId: Long): Long = workoutId
 

@@ -1,6 +1,7 @@
 package dev.wwade.workout.ui.viewmodel
 
 import dev.wwade.workout.domain.model.CompletedSessionListItem
+import dev.wwade.workout.domain.model.ActiveSessionSummary
 import dev.wwade.workout.domain.model.ExerciseSetHistoryItem
 import dev.wwade.workout.domain.model.SetEntry
 import dev.wwade.workout.domain.model.SetEntryDraft
@@ -110,7 +111,7 @@ private class FakeHistorySessionRepository : SessionRepository {
     val sessions = MutableStateFlow(listOf(historyItem(1), historyItem(2)))
     val deletedSessionIds = mutableSetOf<Long>()
 
-    override fun observeActiveSessionId(): Flow<Long?> = flowOf(null)
+    override fun observeActiveSession(): Flow<ActiveSessionSummary?> = flowOf(null)
 
     override suspend fun startWorkout(workoutId: Long): Long = workoutId
 

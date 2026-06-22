@@ -1,5 +1,6 @@
 package dev.wwade.workout.ui.viewmodel
 
+import dev.wwade.workout.domain.model.ActiveSessionSummary
 import dev.wwade.workout.domain.model.CircuitSessionDetail
 import dev.wwade.workout.domain.model.CompletedSessionListItem
 import dev.wwade.workout.domain.model.ExerciseSessionDetail
@@ -389,7 +390,15 @@ private class FakeSessionRepository(
 ) : SessionRepository {
     private val detailFlow = MutableStateFlow(detail)
 
-    override fun observeActiveSessionId(): Flow<Long?> = flowOf(detailFlow.value.sessionId)
+    override fun observeActiveSession(): Flow<ActiveSessionSummary?> {
+        return flowOf(
+            ActiveSessionSummary(
+                sessionId = detailFlow.value.sessionId,
+                workoutTemplateId = detailFlow.value.workoutTemplateId,
+                workoutName = detailFlow.value.workoutName,
+            ),
+        )
+    }
 
     override suspend fun startWorkout(workoutId: Long): Long = error("Not needed in test")
 

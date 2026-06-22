@@ -106,6 +106,12 @@ data class WorkoutListItem(
     val updatedAt: Long,
 )
 
+data class ActiveSessionSummary(
+    val sessionId: Long,
+    val workoutTemplateId: Long?,
+    val workoutName: String,
+)
+
 data class WorkoutSessionDetail(
     val sessionId: Long,
     val workoutTemplateId: Long?,

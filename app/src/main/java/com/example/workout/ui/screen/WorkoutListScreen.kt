@@ -88,6 +88,7 @@ fun WorkoutListScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var pendingExport by remember { mutableStateOf<WorkoutExportFile?>(null) }
+    var pendingActiveWorkoutEditId by remember { mutableStateOf<Long?>(null) }
 
     BackHandler(enabled = state.isSelectionMode, onBack = onClearSelection)
 
@@ -192,7 +193,13 @@ fun WorkoutListScreen(
         WorkoutListContent(
             state = state,
             padding = padding,
-            onEditWorkout = onEditWorkout,
+            onEditWorkout = { workoutId ->
+                if (workoutId == state.activeSession?.workoutTemplateId) {
+                    pendingActiveWorkoutEditId = workoutId
+                } else {
+                    onEditWorkout(workoutId)
+                }
+            },
             onSelectWorkout = onSelectWorkout,
             onToggleWorkoutSelection = onToggleWorkoutSelection,
             onStartWorkout = onStartWorkout,
@@ -218,6 +225,34 @@ fun WorkoutListScreen(
             },
             dismissButton = {
                 TextButton(onClick = onCancelDelete) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+
+    pendingActiveWorkoutEditId?.let { workoutId ->
+        AlertDialog(
+            onDismissRequest = { pendingActiveWorkoutEditId = null },
+            title = { Text("Edit workout?") },
+            text = {
+                Text(
+                    "Editing this workout will not affect the workout currently in progress. " +
+                        "Changes will apply the next time you start it.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingActiveWorkoutEditId = null
+                        onEditWorkout(workoutId)
+                    },
+                ) {
+                    Text("Edit")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingActiveWorkoutEditId = null }) {
                     Text("Cancel")
                 }
             },
@@ -338,6 +373,36 @@ private fun WorkoutListContent(
             }
         }
 
+        state.activeSession?.let { activeSession ->
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .testTag("active-session-banner"),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Workout in progress: ${activeSession.workoutName}",
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    TextButton(
+                        onClick = { onResumeWorkout(activeSession.sessionId) },
+                        modifier = Modifier.testTag("resume-active-session"),
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null)
+                        Text("Resume")
+                    }
+                }
+            }
+        }
+
         if (state.workouts.isEmpty()) {
             Column(
                 modifier = Modifier
@@ -365,7 +430,7 @@ private fun WorkoutListContent(
                         workout = workout,
                         selected = workout.id in state.selectedWorkoutIds,
                         selectionMode = state.isSelectionMode,
-                        activeSessionId = state.activeSessionId,
+                        hasActiveSession = state.activeSession != null,
                         onClick = {
                             if (state.isSelectionMode) {
                                 onToggleWorkoutSelection(workout.id)
@@ -374,7 +439,6 @@ private fun WorkoutListContent(
                         onLongClick = { onSelectWorkout(workout.id) },
                         onEditWorkout = onEditWorkout,
                         onStartWorkout = onStartWorkout,
-                        onResumeWorkout = onResumeWorkout,
                     )
                 }
             }
@@ -388,12 +452,11 @@ private fun WorkoutRow(
     workout: WorkoutListItem,
     selected: Boolean,
     selectionMode: Boolean,
-    activeSessionId: Long?,
+    hasActiveSession: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onEditWorkout: (Long) -> Unit,
     onStartWorkout: (Long) -> Unit,
-    onResumeWorkout: (Long) -> Unit,
 ) {
     Card(
         modifier = Modifier
@@ -435,18 +498,13 @@ private fun WorkoutRow(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        IconButton(onClick = { onEditWorkout(workout.id) }) {
+                        IconButton(
+                            onClick = { onEditWorkout(workout.id) },
+                            modifier = Modifier.testTag("edit-workout-${workout.id}"),
+                        ) {
                             Icon(Icons.Default.Edit, contentDescription = "Edit")
                         }
-                        if (activeSessionId != null) {
-                            TextButton(
-                                onClick = { onResumeWorkout(activeSessionId) },
-                                modifier = Modifier.testTag("resume-workout"),
-                            ) {
-                                Icon(Icons.Default.PlayArrow, contentDescription = null)
-                                Text("Resume")
-                            }
-                        } else {
+                        if (!hasActiveSession) {
                             TextButton(
                                 onClick = { onStartWorkout(workout.id) },
                                 modifier = Modifier.testTag("start-workout-${workout.id}"),

@@ -3,6 +3,7 @@ package dev.wwade.workout.data.repository
 import dev.wwade.workout.data.db.SetEntryEntity
 import dev.wwade.workout.data.db.WorkoutSessionDao
 import dev.wwade.workout.data.db.WorkoutTemplateDao
+import dev.wwade.workout.domain.model.ActiveSessionSummary
 import dev.wwade.workout.domain.model.CompletedSessionListItem
 import dev.wwade.workout.domain.model.ExerciseSetHistoryItem
 import dev.wwade.workout.domain.model.SetEntry
@@ -18,8 +19,16 @@ class RoomSessionRepository(
     private val workoutTemplateDao: WorkoutTemplateDao,
     private val workoutSessionDao: WorkoutSessionDao,
 ) : SessionRepository {
-    override fun observeActiveSessionId(): Flow<Long?> {
-        return workoutSessionDao.observeActiveSession().map { it?.id }
+    override fun observeActiveSession(): Flow<ActiveSessionSummary?> {
+        return workoutSessionDao.observeActiveSession().map { session ->
+            session?.let {
+                ActiveSessionSummary(
+                    sessionId = it.id,
+                    workoutTemplateId = it.workoutTemplateId,
+                    workoutName = it.workoutNameSnapshot,
+                )
+            }
+        }
     }
 
     override suspend fun startWorkout(workoutId: Long): Long {
