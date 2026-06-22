@@ -156,12 +156,12 @@ The app uses a single `app` module and is split into three main layers:
 3. Run `./gradlew testDebugUnitTest` or let Android Studio sync the project.
 4. Run the `app` configuration on an emulator or Android device.
 
-For device-backed instrumentation runs, use the managed virtual device task `./gradlew simDebugAndroidTest`. The `e2e` build variant can still be assembled separately with `./gradlew assembleE2e`, but this Gradle project does not currently expose an e2e-specific managed-device test task.
+For device-backed instrumentation runs, use `./gradlew app:connectedDebugAndroidTest` with a connected emulator or device. The `e2e` build variant can still be assembled separately with `./gradlew assembleE2e`, but this Gradle project does not currently expose an e2e-specific connected Android test task.
 
 ## Current Status
 
 This repo contains the MVP scaffold and core flows. The checked-in Gradle wrapper works, the unit-test build passes, and the debug APK assembles successfully.
 
-Instrumentation tests are included, and they now run on the managed Pixel 9 Pro API 36 virtual device by default. The project still uses separate app ids for `debug` and `e2e` builds so device tests can run without colliding with a normal installed app.
+Instrumentation tests are included, but they require a connected emulator or Android device. The project now includes separate app ids for `debug` and `e2e` builds so device tests can run without colliding with a normal installed app.
 
 See [DEVELOPING.md](DEVELOPING.md) for setup details and implementation notes.
