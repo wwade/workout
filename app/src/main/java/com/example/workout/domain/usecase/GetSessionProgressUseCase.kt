@@ -123,7 +123,7 @@ object SessionProgressCalculator {
                 suggestedReps = currentSet?.repsActual ?: previousSet?.repsActual ?: prefill?.repsActual,
                 suggestedLoad = currentSet?.loadActual ?: previousSet?.loadActual ?: prefill?.loadActual,
                 suggestedNotes = currentSet?.notes ?: previousSet?.notes ?: prefill?.notes.orEmpty(),
-                suggestedSkipped = currentSet?.skipped ?: false,
+                suggestedSkipped = currentSet?.skipped ?: previousSet?.skipped ?: prefill?.skipped ?: false,
             )
         }
         return SessionProgressSnapshot(

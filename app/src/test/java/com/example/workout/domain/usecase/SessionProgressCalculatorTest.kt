@@ -123,7 +123,7 @@ class SessionProgressCalculatorTest {
     }
 
     @Test
-    fun doesNotCarrySkippedStateFromHistory() = runTest {
+    fun prefillSkippedStateFromHistory() = runTest {
         val detail = sessionDetail(
             setCount = 3,
             firstExerciseSets = emptyList(),
@@ -137,6 +137,46 @@ class SessionProgressCalculatorTest {
                     exerciseSessionId = 999,
                     setIndex = 0,
                     loadActual = 30.0,
+                    skipped = true,
+                )
+            },
+        )
+
+        assertThat(snapshot.exercises.all { it.suggestedSkipped }).isTrue()
+    }
+
+    @Test
+    fun prefersPreviousSetSkippedStateForNextRound() = runTest {
+        val detail = sessionDetail(
+            setCount = 3,
+            firstExerciseSets = listOf(setEntry(0, 0, skipped = true)),
+            secondExerciseSets = listOf(setEntry(1, 0, skipped = true)),
+        )
+
+        val snapshot = SessionProgressCalculator.buildSnapshot(
+            detail = detail,
+            prefillProvider = { _, _ -> null },
+        )
+
+        assertThat(snapshot.currentSetIndex).isEqualTo(1)
+        assertThat(snapshot.exercises.all { it.suggestedSkipped }).isTrue()
+    }
+
+    @Test
+    fun prefersCurrentSetSkippedStateOverHistory() = runTest {
+        val detail = sessionDetail(
+            setCount = 3,
+            firstExerciseSets = listOf(setEntry(0, 0, skipped = false)),
+            secondExerciseSets = listOf(setEntry(1, 0, skipped = false)),
+        )
+
+        val snapshot = SessionProgressCalculator.buildSnapshot(
+            detail = detail,
+            selectedPosition = SessionProgressCalculator.CurrentPosition(circuitIndex = 0, setIndex = 0),
+            prefillProvider = { _, _ ->
+                setEntry(
+                    exerciseSessionId = 999,
+                    setIndex = 0,
                     skipped = true,
                 )
             },
