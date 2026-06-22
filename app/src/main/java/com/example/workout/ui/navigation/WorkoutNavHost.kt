@@ -46,6 +46,10 @@ fun WorkoutNavHost(
                         sessionRepository = container.sessionRepository,
                         importWorkoutsUseCase = container.importWorkoutsUseCase,
                         exportWorkoutDataUseCase = container.exportWorkoutDataUseCase,
+                        driveBackupSettingsRepository = container.driveBackupSettingsRepository,
+                        setDriveBackupEnabledUseCase = container.setDriveBackupEnabledUseCase,
+                        listDriveBackupSnapshotsUseCase = container.listDriveBackupSnapshotsUseCase,
+                        restoreDriveBackupUseCase = container.restoreDriveBackupUseCase,
                     )
                 },
             )
@@ -81,6 +85,14 @@ fun WorkoutNavHost(
                 onImportFromJson = viewModel::importFromJson,
                 onImportFileReadFailed = viewModel::showImportError,
                 onDismissImportMessage = viewModel::clearImportMessage,
+                onShowDriveBackupOptions = viewModel::showDriveBackupOptions,
+                onHideDriveBackupDialog = viewModel::hideDriveBackupDialog,
+                onDisableDriveBackup = viewModel::disableDriveBackup,
+                onDriveAuthorizationToken = viewModel::onDriveAuthorizationToken,
+                onDriveAuthorizationFailed = viewModel::onDriveAuthorizationFailed,
+                onRequestRestoreDriveBackup = viewModel::requestRestoreDriveBackup,
+                onCancelRestoreDriveBackup = viewModel::cancelRestoreDriveBackup,
+                onConfirmRestoreDriveBackup = viewModel::confirmRestoreDriveBackup,
             )
         }
 
@@ -137,6 +149,7 @@ fun WorkoutNavHost(
                     ActiveSessionViewModel(
                         sessionRepository = container.sessionRepository,
                         sessionId = sessionId,
+                        backupNowAfterWorkoutCompletionUseCase = container.backupNowAfterWorkoutCompletionUseCase,
                     )
                 },
             )

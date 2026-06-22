@@ -12,7 +12,7 @@ interface SessionRepository {
     fun observeActiveSession(): Flow<ActiveSessionSummary?>
     suspend fun startWorkout(workoutId: Long): Long
     suspend fun abandonSession(sessionId: Long)
-    suspend fun saveRoundEntries(sessionId: Long, entries: List<SetEntryDraft>)
+    suspend fun saveRoundEntries(sessionId: Long, entries: List<SetEntryDraft>): Boolean
     fun observeSessionDetail(sessionId: Long): Flow<WorkoutSessionDetail?>
     suspend fun getSessionDetail(sessionId: Long): WorkoutSessionDetail?
     fun observeCompletedSessions(): Flow<List<CompletedSessionListItem>>

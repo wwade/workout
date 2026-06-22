@@ -3,6 +3,8 @@ package dev.wwade.workout.ui.state
 import dev.wwade.workout.domain.model.ActiveSessionSummary
 import dev.wwade.workout.domain.model.CompletedSessionListItem
 import dev.wwade.workout.domain.model.WorkoutListItem
+import dev.wwade.workout.domain.backup.DriveBackupSettings
+import dev.wwade.workout.domain.backup.DriveBackupSnapshot
 
 data class WorkoutListState(
     val workouts: List<WorkoutListItem> = emptyList(),
@@ -15,12 +17,29 @@ data class WorkoutListState(
     val importDialog: WorkoutImportDialog = WorkoutImportDialog.None,
     val importUrl: String = "",
     val message: WorkoutListMessage? = null,
+    val driveBackupSettings: DriveBackupSettings = DriveBackupSettings(),
+    val driveBackupDialog: DriveBackupDialog = DriveBackupDialog.None,
+    val driveBackupSnapshots: List<DriveBackupSnapshot> = emptyList(),
+    val pendingRestoreSnapshot: DriveBackupSnapshot? = null,
+    val isDriveBackupBusy: Boolean = false,
 )
 
 enum class WorkoutImportDialog {
     None,
     ChooseSource,
     UrlInput,
+}
+
+enum class DriveBackupDialog {
+    None,
+    Options,
+    Snapshots,
+    ConfirmRestore,
+}
+
+enum class DriveBackupAuthorizationAction {
+    Enable,
+    ListSnapshots,
 }
 
 data class WorkoutListMessage(

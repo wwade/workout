@@ -2,6 +2,13 @@ package dev.wwade.workout.ui.viewmodel
 
 import dev.wwade.workout.domain.exporter.ExportWorkoutDataUseCase
 import dev.wwade.workout.domain.exporter.WorkoutDataExportSnapshot
+import dev.wwade.workout.domain.backup.DriveBackupRepository
+import dev.wwade.workout.domain.backup.DriveBackupSettings
+import dev.wwade.workout.domain.backup.DriveBackupSettingsRepository
+import dev.wwade.workout.domain.backup.DriveBackupSnapshot
+import dev.wwade.workout.domain.backup.ListDriveBackupSnapshotsUseCase
+import dev.wwade.workout.domain.backup.RestoreDriveBackupUseCase
+import dev.wwade.workout.domain.backup.SetDriveBackupEnabledUseCase
 import dev.wwade.workout.domain.importer.ImportWorkoutsUseCase
 import dev.wwade.workout.domain.importer.WorkoutImportException
 import dev.wwade.workout.domain.importer.WorkoutImportJsonFetcher
@@ -30,6 +37,8 @@ import dev.wwade.workout.domain.repository.SessionRepository
 import dev.wwade.workout.domain.repository.WorkoutDataImportRepository
 import dev.wwade.workout.domain.repository.WorkoutDataExportRepository
 import dev.wwade.workout.domain.repository.WorkoutRepository
+import dev.wwade.workout.ui.state.DriveBackupAuthorizationAction
+import dev.wwade.workout.ui.state.DriveBackupDialog
 import dev.wwade.workout.ui.state.WorkoutImportDialog
 import dev.wwade.workout.util.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
@@ -225,6 +234,98 @@ class WorkoutListViewModelTest {
     }
 
     @Test
+    fun driveAuthorizationEnableUpdatesSettingsAndMessage() = runTest {
+        val settingsRepository = FakeDriveBackupSettingsRepository()
+        val viewModel = viewModel(
+            repository = FakeWorkoutRepository(),
+            driveBackupSettingsRepository = settingsRepository,
+        )
+        val collector = backgroundScope.launch {
+            viewModel.state.collectLatest { }
+        }
+
+        viewModel.onDriveAuthorizationToken(DriveBackupAuthorizationAction.Enable, "token")
+        advanceUntilIdle()
+
+        assertThat(settingsRepository.settings.value.enabled).isTrue()
+        assertThat(viewModel.state.value.driveBackupSettings.enabled).isTrue()
+        assertThat(viewModel.state.value.message?.text).contains("Drive backup is enabled")
+        collector.cancel()
+    }
+
+    @Test
+    fun listDriveBackupsShowsSnapshots() = runTest {
+        val driveRepository = FakeDriveBackupRepository(
+            snapshots = listOf(
+                DriveBackupSnapshot(
+                    id = "older",
+                    fileName = "workout-tracker-backup-100.json",
+                    exportedAt = 100,
+                    modifiedTime = 100,
+                    sizeBytes = 10,
+                ),
+                DriveBackupSnapshot(
+                    id = "newer",
+                    fileName = "workout-tracker-backup-200.json",
+                    exportedAt = 200,
+                    modifiedTime = 200,
+                    sizeBytes = 20,
+                ),
+            ),
+        )
+        val viewModel = viewModel(
+            repository = FakeWorkoutRepository(),
+            driveBackupRepository = driveRepository,
+        )
+        val collector = backgroundScope.launch {
+            viewModel.state.collectLatest { }
+        }
+
+        viewModel.onDriveAuthorizationToken(DriveBackupAuthorizationAction.ListSnapshots, "token")
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.driveBackupDialog).isEqualTo(DriveBackupDialog.Snapshots)
+        assertThat(viewModel.state.value.driveBackupSnapshots.map { it.id }).containsExactly("newer", "older").inOrder()
+        collector.cancel()
+    }
+
+    @Test
+    fun confirmDriveRestoreRestoresSnapshotAndShowsCounts() = runTest {
+        val importRepository = FakeWorkoutDataImportRepository()
+        val driveRepository = FakeDriveBackupRepository(
+            snapshots = listOf(
+                DriveBackupSnapshot(
+                    id = "snapshot",
+                    fileName = "workout-tracker-backup-200.json",
+                    exportedAt = 200,
+                    modifiedTime = 200,
+                    sizeBytes = 20,
+                ),
+            ),
+            downloadPayload = validWorkoutDataBackupJson(),
+        )
+        val viewModel = viewModel(
+            repository = FakeWorkoutRepository(),
+            importRepository = importRepository,
+            driveBackupRepository = driveRepository,
+        )
+        val collector = backgroundScope.launch {
+            viewModel.state.collectLatest { }
+        }
+
+        viewModel.onDriveAuthorizationToken(DriveBackupAuthorizationAction.ListSnapshots, "token")
+        advanceUntilIdle()
+        viewModel.requestRestoreDriveBackup("snapshot")
+        viewModel.confirmRestoreDriveBackup()
+        advanceUntilIdle()
+
+        assertThat(importRepository.restoredSnapshot?.workouts?.single()?.name).isEqualTo("Push Day")
+        assertThat(viewModel.state.value.message?.text).isEqualTo("Restored 1 exercise, 1 workout, and 1 session.")
+        assertThat(viewModel.state.value.driveBackupDialog).isEqualTo(DriveBackupDialog.None)
+        collector.cancel()
+    }
+
+    @Test
     fun importDialogsUpdateState() = runTest {
         val viewModel = viewModel(FakeWorkoutRepository())
         val collector = backgroundScope.launch {
@@ -371,6 +472,8 @@ class WorkoutListViewModelTest {
         },
         importRepository: WorkoutDataImportRepository = FakeWorkoutDataImportRepository(),
         exportRepository: WorkoutDataExportRepository = FakeWorkoutDataExportRepository(),
+        driveBackupSettingsRepository: DriveBackupSettingsRepository = FakeDriveBackupSettingsRepository(),
+        driveBackupRepository: DriveBackupRepository = FakeDriveBackupRepository(),
     ): WorkoutListViewModel {
         return WorkoutListViewModel(
             workoutRepository = repository,
@@ -383,6 +486,17 @@ class WorkoutListViewModelTest {
             exportWorkoutDataUseCase = ExportWorkoutDataUseCase(
                 exportRepository = exportRepository,
                 clock = Clock.fixed(Instant.parse("2026-06-21T07:00:00Z"), ZoneOffset.UTC),
+            ),
+            driveBackupSettingsRepository = driveBackupSettingsRepository,
+            setDriveBackupEnabledUseCase = SetDriveBackupEnabledUseCase(driveBackupSettingsRepository),
+            listDriveBackupSnapshotsUseCase = ListDriveBackupSnapshotsUseCase(driveBackupRepository),
+            restoreDriveBackupUseCase = RestoreDriveBackupUseCase(
+                driveBackupRepository = driveBackupRepository,
+                importWorkoutsUseCase = ImportWorkoutsUseCase(
+                    workoutRepository = repository,
+                    importRepository = importRepository,
+                    jsonFetcher = fetcher,
+                ),
             ),
         )
     }
@@ -400,6 +514,58 @@ private class FakeWorkoutDataImportRepository : WorkoutDataImportRepository {
             sessionCount = snapshot.sessions.size,
         )
     }
+}
+
+private class FakeDriveBackupSettingsRepository(
+    initialSettings: DriveBackupSettings = DriveBackupSettings(),
+) : DriveBackupSettingsRepository {
+    val settings = MutableStateFlow(initialSettings)
+
+    override fun observeSettings(): Flow<DriveBackupSettings> = settings
+
+    override suspend fun getSettings(): DriveBackupSettings = settings.value
+
+    override suspend fun setEnabled(enabled: Boolean) {
+        settings.value = settings.value.copy(enabled = enabled)
+    }
+
+    override suspend fun recordBackupSuccess(snapshot: DriveBackupSnapshot) {
+        settings.value = settings.value.copy(
+            lastSuccessAt = snapshot.modifiedTime,
+            lastSuccessFileName = snapshot.fileName,
+            lastFailureMessage = null,
+        )
+    }
+
+    override suspend fun recordBackupFailure(message: String) {
+        settings.value = settings.value.copy(lastFailureMessage = message)
+    }
+}
+
+private class FakeDriveBackupRepository(
+    private val snapshots: List<DriveBackupSnapshot> = emptyList(),
+    private val downloadPayload: String = "{}",
+) : DriveBackupRepository {
+    override suspend fun uploadSnapshot(
+        accessToken: String,
+        fileName: String,
+        exportedAt: Long,
+        json: String,
+    ): DriveBackupSnapshot {
+        return DriveBackupSnapshot(
+            id = "uploaded",
+            fileName = fileName,
+            exportedAt = exportedAt,
+            modifiedTime = exportedAt,
+            sizeBytes = json.length.toLong(),
+        )
+    }
+
+    override suspend fun listSnapshots(accessToken: String): List<DriveBackupSnapshot> = snapshots
+
+    override suspend fun downloadSnapshot(accessToken: String, snapshotId: String): String = downloadPayload
+
+    override suspend fun deleteSnapshot(accessToken: String, snapshotId: String) = Unit
 }
 
 private class FakeWorkoutRepository : WorkoutRepository {
@@ -447,7 +613,7 @@ private class FakeWorkoutListSessionRepository : SessionRepository {
     override suspend fun saveRoundEntries(
         sessionId: Long,
         entries: List<dev.wwade.workout.domain.model.SetEntryDraft>,
-    ) = Unit
+    ): Boolean = false
 
     override fun observeSessionDetail(
         sessionId: Long,

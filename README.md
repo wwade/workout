@@ -24,6 +24,7 @@ The app is built around two modes:
 - Import workout templates from a local JSON or YAML file, or a direct JSON/YAML URL
 - Export all templates and session history to a local JSON backup file
 - Restore a full JSON backup exported from the app
+- Save and restore rolling Google Drive backups in the app-specific Drive data folder
 
 ## Importing Workouts
 
@@ -103,6 +104,12 @@ Exports include:
 - session snapshots and set entries
 
 The current export schema is JSON-only, uses top-level `schemaVersion: 2`, and includes canonical exercise ids so shared exercise history can be reconstructed. The importer also accepts legacy `schemaVersion: 1` backups that were exported before canonical exercise ids were added. Early `schemaVersion: 2` backups with missing historical session exercise ids are repaired during import by matching session snapshots to canonical exercise names.
+
+## Google Drive Backup
+
+Use the Drive backup action on the workout list screen to grant app-specific Google Drive permission. When enabled, the app saves a JSON backup to the hidden Drive `appDataFolder` each time a workout is completed. The app keeps the newest five Drive snapshots and deletes older snapshots after a successful upload.
+
+The same Drive backup action can restore one of the available snapshots. Drive restore uses the full-backup restore path, so it replaces the current workout data with the selected snapshot.
 
 ## Data Model
 

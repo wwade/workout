@@ -122,6 +122,8 @@ dependencies {
     implementation(libs.google.material)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
+    implementation(libs.play.services.auth)
+    implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.snakeyaml.engine)
     ksp(libs.androidx.room.compiler)

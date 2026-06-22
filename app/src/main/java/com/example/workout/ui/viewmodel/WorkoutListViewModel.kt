@@ -2,15 +2,24 @@ package dev.wwade.workout.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.wwade.workout.domain.backup.DriveBackupSettings
+import dev.wwade.workout.domain.backup.DriveBackupSettingsRepository
+import dev.wwade.workout.domain.backup.ListDriveBackupSnapshotsUseCase
+import dev.wwade.workout.domain.backup.RestoreDriveBackupUseCase
+import dev.wwade.workout.domain.backup.SetDriveBackupEnabledUseCase
 import dev.wwade.workout.domain.exporter.ExportWorkoutDataUseCase
 import dev.wwade.workout.domain.importer.ImportWorkoutsUseCase
 import dev.wwade.workout.domain.importer.WorkoutImportException
 import dev.wwade.workout.domain.importer.WorkoutImportRequest
 import dev.wwade.workout.domain.importer.WorkoutImportResult
 import dev.wwade.workout.domain.importer.WorkoutImportSource
+import dev.wwade.workout.domain.model.ActiveSessionSummary
+import dev.wwade.workout.domain.model.WorkoutListItem
 import dev.wwade.workout.domain.repository.SessionRepository
 import dev.wwade.workout.domain.repository.WorkoutRepository
 import dev.wwade.workout.domain.usecase.StartWorkoutUseCase
+import dev.wwade.workout.ui.state.DriveBackupAuthorizationAction
+import dev.wwade.workout.ui.state.DriveBackupDialog
 import dev.wwade.workout.ui.state.WorkoutImportDialog
 import dev.wwade.workout.ui.state.WorkoutListMessage
 import dev.wwade.workout.ui.state.WorkoutListState
@@ -21,6 +30,7 @@ import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
@@ -32,36 +42,62 @@ class WorkoutListViewModel(
     private val sessionRepository: SessionRepository,
     private val importWorkoutsUseCase: ImportWorkoutsUseCase = ImportWorkoutsUseCase(workoutRepository),
     private val exportWorkoutDataUseCase: ExportWorkoutDataUseCase,
+    private val driveBackupSettingsRepository: DriveBackupSettingsRepository = DisabledDriveBackupSettingsRepository(),
+    private val setDriveBackupEnabledUseCase: SetDriveBackupEnabledUseCase =
+        SetDriveBackupEnabledUseCase(driveBackupSettingsRepository),
+    private val listDriveBackupSnapshotsUseCase: ListDriveBackupSnapshotsUseCase? = null,
+    private val restoreDriveBackupUseCase: RestoreDriveBackupUseCase? = null,
     private val clock: Clock = Clock.systemUTC(),
 ) : ViewModel() {
     private val startWorkoutUseCase = StartWorkoutUseCase(sessionRepository)
     private val importState = MutableStateFlow(WorkoutListImportState())
+    private val driveState = MutableStateFlow(WorkoutListDriveState())
     private val selectedWorkoutIds = MutableStateFlow<Set<Long>>(emptySet())
     private val pendingDeleteCount = MutableStateFlow(0)
+    private var currentDriveAccessToken: String? = null
     private val workouts = workoutRepository.observeWorkouts()
         .onEach { workouts ->
             val visibleWorkoutIds = workouts.map { it.id }.toSet()
             selectedWorkoutIds.update { selected -> selected.intersect(visibleWorkoutIds) }
         }
 
-    val state: StateFlow<WorkoutListState> = combine(
+    private val homeState = combine(
         workouts,
         sessionRepository.observeActiveSession(),
         importState,
-        selectedWorkoutIds,
-        pendingDeleteCount,
-    ) { workouts, activeSession, importState, selectedIds, deleteCount ->
-        WorkoutListState(
+        driveBackupSettingsRepository.observeSettings(),
+        driveState,
+    ) { workouts, activeSession, importState, driveBackupSettings, driveState ->
+        WorkoutListHomeState(
             workouts = workouts,
             activeSession = activeSession,
+            importState = importState,
+            driveBackupSettings = driveBackupSettings,
+            driveState = driveState,
+        )
+    }
+
+    val state: StateFlow<WorkoutListState> = combine(
+        homeState,
+        selectedWorkoutIds,
+        pendingDeleteCount,
+    ) { homeState, selectedIds, deleteCount ->
+        WorkoutListState(
+            workouts = homeState.workouts,
+            activeSession = homeState.activeSession,
             selectedWorkoutIds = selectedIds,
             isSelectionMode = selectedIds.isNotEmpty(),
             pendingDeleteCount = deleteCount,
-            isImporting = importState.isImporting,
-            isExporting = importState.isExporting,
-            importDialog = importState.importDialog,
-            importUrl = importState.importUrl,
-            message = importState.message,
+            isImporting = homeState.importState.isImporting,
+            isExporting = homeState.importState.isExporting,
+            importDialog = homeState.importState.importDialog,
+            importUrl = homeState.importState.importUrl,
+            message = homeState.importState.message,
+            driveBackupSettings = homeState.driveBackupSettings,
+            driveBackupDialog = homeState.driveState.dialog,
+            driveBackupSnapshots = homeState.driveState.snapshots,
+            pendingRestoreSnapshot = homeState.driveState.pendingRestoreSnapshot,
+            isDriveBackupBusy = homeState.driveState.isBusy,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -143,6 +179,168 @@ class WorkoutListViewModel(
 
     fun clearImportMessage() {
         importState.update { it.copy(message = null) }
+    }
+
+    fun showDriveBackupOptions() {
+        driveState.update { it.copy(dialog = DriveBackupDialog.Options) }
+        importState.update { it.copy(message = null) }
+    }
+
+    fun hideDriveBackupDialog() {
+        driveState.update {
+            it.copy(
+                dialog = DriveBackupDialog.None,
+                pendingRestoreSnapshot = null,
+            )
+        }
+    }
+
+    fun disableDriveBackup() {
+        viewModelScope.launch {
+            setDriveBackupEnabledUseCase(false)
+            currentDriveAccessToken = null
+            driveState.update { it.copy(dialog = DriveBackupDialog.None) }
+            importState.update {
+                it.copy(
+                    message = WorkoutListMessage(
+                        text = "Drive backup is disabled.",
+                        isError = false,
+                    ),
+                )
+            }
+        }
+    }
+
+    fun onDriveAuthorizationFailed(message: String) {
+        driveState.update { it.copy(isBusy = false) }
+        importState.update {
+            it.copy(
+                message = WorkoutListMessage(
+                    text = message,
+                    isError = true,
+                ),
+            )
+        }
+    }
+
+    fun onDriveAuthorizationToken(action: DriveBackupAuthorizationAction, accessToken: String) {
+        currentDriveAccessToken = accessToken
+        when (action) {
+            DriveBackupAuthorizationAction.Enable -> enableDriveBackup()
+            DriveBackupAuthorizationAction.ListSnapshots -> loadDriveBackupSnapshots(accessToken)
+        }
+    }
+
+    private fun enableDriveBackup() {
+        viewModelScope.launch {
+            setDriveBackupEnabledUseCase(true)
+            driveState.update { it.copy(dialog = DriveBackupDialog.None, isBusy = false) }
+            importState.update {
+                it.copy(
+                    message = WorkoutListMessage(
+                        text = "Drive backup is enabled. A backup will be saved when you complete a workout.",
+                        isError = false,
+                    ),
+                )
+            }
+        }
+    }
+
+    private fun loadDriveBackupSnapshots(accessToken: String) {
+        viewModelScope.launch {
+            val listUseCase = listDriveBackupSnapshotsUseCase
+            if (listUseCase == null) {
+                onDriveAuthorizationFailed("Drive restore is not available.")
+                return@launch
+            }
+            driveState.update { it.copy(isBusy = true, dialog = DriveBackupDialog.Snapshots) }
+            runCatching {
+                listUseCase(accessToken)
+            }.onSuccess { snapshots ->
+                driveState.update {
+                    it.copy(
+                        isBusy = false,
+                        snapshots = snapshots,
+                        dialog = DriveBackupDialog.Snapshots,
+                    )
+                }
+                if (snapshots.isEmpty()) {
+                    importState.update {
+                        it.copy(
+                            message = WorkoutListMessage(
+                                text = "No Drive backups were found.",
+                                isError = false,
+                            ),
+                        )
+                    }
+                }
+            }.onFailure { error ->
+                driveState.update { it.copy(isBusy = false, dialog = DriveBackupDialog.Options) }
+                importState.update {
+                    it.copy(
+                        message = WorkoutListMessage(
+                            text = error.message ?: "Unable to list Drive backups.",
+                            isError = true,
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    fun requestRestoreDriveBackup(snapshotId: String) {
+        val snapshot = driveState.value.snapshots.firstOrNull { it.id == snapshotId } ?: return
+        driveState.update {
+            it.copy(
+                dialog = DriveBackupDialog.ConfirmRestore,
+                pendingRestoreSnapshot = snapshot,
+            )
+        }
+    }
+
+    fun cancelRestoreDriveBackup() {
+        driveState.update {
+            it.copy(
+                dialog = DriveBackupDialog.Snapshots,
+                pendingRestoreSnapshot = null,
+            )
+        }
+    }
+
+    fun confirmRestoreDriveBackup() {
+        val accessToken = currentDriveAccessToken
+        val snapshot = driveState.value.pendingRestoreSnapshot
+        val restoreUseCase = restoreDriveBackupUseCase
+        if (accessToken.isNullOrBlank() || snapshot == null || restoreUseCase == null) {
+            onDriveAuthorizationFailed("Drive restore needs Google Drive permission again.")
+            return
+        }
+
+        viewModelScope.launch {
+            driveState.update { it.copy(isBusy = true) }
+            runCatching {
+                restoreUseCase(accessToken, snapshot.id)
+            }.onSuccess { result ->
+                driveState.update {
+                    it.copy(
+                        isBusy = false,
+                        dialog = DriveBackupDialog.None,
+                        pendingRestoreSnapshot = null,
+                    )
+                }
+                importState.update { it.copy(message = result.toMessage()) }
+            }.onFailure { error ->
+                driveState.update { it.copy(isBusy = false, dialog = DriveBackupDialog.Snapshots) }
+                importState.update {
+                    it.copy(
+                        message = WorkoutListMessage(
+                            text = error.importMessage(),
+                            isError = true,
+                        ),
+                    )
+                }
+            }
+        }
     }
 
     fun showImportError(message: String) {
@@ -315,6 +513,21 @@ private data class WorkoutListImportState(
     val message: WorkoutListMessage? = null,
 )
 
+private data class WorkoutListHomeState(
+    val workouts: List<WorkoutListItem>,
+    val activeSession: ActiveSessionSummary?,
+    val importState: WorkoutListImportState,
+    val driveBackupSettings: DriveBackupSettings,
+    val driveState: WorkoutListDriveState,
+)
+
+private data class WorkoutListDriveState(
+    val dialog: DriveBackupDialog = DriveBackupDialog.None,
+    val snapshots: List<dev.wwade.workout.domain.backup.DriveBackupSnapshot> = emptyList(),
+    val pendingRestoreSnapshot: dev.wwade.workout.domain.backup.DriveBackupSnapshot? = null,
+    val isBusy: Boolean = false,
+)
+
 data class WorkoutExportFile(
     val fileName: String,
     val content: String,
@@ -322,3 +535,19 @@ data class WorkoutExportFile(
 
 private val EXPORT_FILE_DATE_FORMAT: DateTimeFormatter =
     DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneOffset.UTC)
+
+private class DisabledDriveBackupSettingsRepository : DriveBackupSettingsRepository {
+    private val settings = flowOf(DriveBackupSettings())
+
+    override fun observeSettings() = settings
+
+    override suspend fun getSettings(): DriveBackupSettings = DriveBackupSettings()
+
+    override suspend fun setEnabled(enabled: Boolean) = Unit
+
+    override suspend fun recordBackupSuccess(
+        snapshot: dev.wwade.workout.domain.backup.DriveBackupSnapshot,
+    ) = Unit
+
+    override suspend fun recordBackupFailure(message: String) = Unit
+}

@@ -118,6 +118,16 @@ Full data export is implemented as a separate domain-level exporter plus a worko
 - The current export schema is JSON-only and includes exercise definitions, templates, sessions, snapshot rows, and set entries.
 - Export `schemaVersion` is `2`; exercise template and session exercise rows include `exerciseDefinitionId`. Older `schemaVersion` `1` exports did not include those fields and are handled by the import compatibility path.
 
+## Google Drive Backup Notes
+
+- Drive backups reuse the full JSON export/import schema; there is no separate backup payload format.
+- Drive storage is scoped to `https://www.googleapis.com/auth/drive.appdata`, so snapshots live in the app-specific hidden Drive data folder.
+- Automatic backup is enabled only after explicit user authorization from the workout list screen.
+- `RoomSessionRepository.saveRoundEntries` returns whether the save newly completed the session. `ActiveSessionViewModel` uses that transition to launch a non-blocking Drive backup.
+- `BackupNowAfterWorkoutCompletionUseCase` uploads a new snapshot, then prunes older snapshots so only the newest five remain.
+- Restore from Drive downloads the selected snapshot and uses the same destructive full-backup restore path as local backup import.
+- If silent authorization is unavailable during automatic backup, completion still succeeds and the backup failure is stored in Drive backup settings for the home screen.
+
 ## Persistence Notes
 
 - Template definitions and performed sessions are stored in Room.

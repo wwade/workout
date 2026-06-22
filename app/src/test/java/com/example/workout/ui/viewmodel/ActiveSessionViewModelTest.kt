@@ -12,6 +12,7 @@ import dev.wwade.workout.domain.model.SetEntry
 import dev.wwade.workout.domain.model.SetEntryDraft
 import dev.wwade.workout.domain.model.WorkoutSessionDetail
 import dev.wwade.workout.domain.repository.SessionRepository
+import dev.wwade.workout.domain.usecase.SessionProgressCalculator
 import dev.wwade.workout.util.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -404,7 +405,8 @@ private class FakeSessionRepository(
 
     override suspend fun abandonSession(sessionId: Long) = Unit
 
-    override suspend fun saveRoundEntries(sessionId: Long, entries: List<SetEntryDraft>) {
+    override suspend fun saveRoundEntries(sessionId: Long, entries: List<SetEntryDraft>): Boolean {
+        val wasCompleted = SessionProgressCalculator.isCompleted(detailFlow.value)
         detailFlow.value = detailFlow.value.copy(
             circuits = detailFlow.value.circuits.map { circuit ->
                 circuit.copy(
@@ -433,6 +435,7 @@ private class FakeSessionRepository(
                 )
             },
         )
+        return !wasCompleted && SessionProgressCalculator.isCompleted(detailFlow.value)
     }
 
     override fun observeSessionDetail(sessionId: Long): Flow<WorkoutSessionDetail?> = detailFlow

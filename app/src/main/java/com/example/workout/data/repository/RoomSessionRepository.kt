@@ -49,7 +49,7 @@ class RoomSessionRepository(
         )
     }
 
-    override suspend fun saveRoundEntries(sessionId: Long, entries: List<SetEntryDraft>) {
+    override suspend fun saveRoundEntries(sessionId: Long, entries: List<SetEntryDraft>): Boolean {
         workoutSessionDao.upsertSetEntries(
             entries.map {
                 SetEntryEntity(
@@ -62,14 +62,16 @@ class RoomSessionRepository(
                 )
             },
         )
-        val detail = getSessionDetail(sessionId) ?: return
+        val detail = getSessionDetail(sessionId) ?: return false
         if (SessionProgressCalculator.isCompleted(detail) && detail.status != SessionStatus.COMPLETED) {
             workoutSessionDao.updateSessionStatus(
                 sessionId = sessionId,
                 status = SessionStatus.COMPLETED,
                 completedAt = System.currentTimeMillis(),
             )
+            return true
         }
+        return false
     }
 
     override fun observeSessionDetail(sessionId: Long): Flow<WorkoutSessionDetail?> {

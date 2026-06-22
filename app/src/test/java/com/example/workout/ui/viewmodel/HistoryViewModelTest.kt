@@ -117,7 +117,7 @@ private class FakeHistorySessionRepository : SessionRepository {
 
     override suspend fun abandonSession(sessionId: Long) = Unit
 
-    override suspend fun saveRoundEntries(sessionId: Long, entries: List<SetEntryDraft>) = Unit
+    override suspend fun saveRoundEntries(sessionId: Long, entries: List<SetEntryDraft>): Boolean = false
 
     override fun observeSessionDetail(sessionId: Long): Flow<WorkoutSessionDetail?> = flowOf(null)
 

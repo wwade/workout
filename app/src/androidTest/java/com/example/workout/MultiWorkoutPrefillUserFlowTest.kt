@@ -31,6 +31,15 @@ import dev.wwade.workout.data.repository.RoomSessionRepository
 import dev.wwade.workout.data.repository.RoomWorkoutDataExportRepository
 import dev.wwade.workout.data.repository.RoomWorkoutDataImportRepository
 import dev.wwade.workout.data.repository.RoomWorkoutRepository
+import dev.wwade.workout.domain.backup.BackupNowAfterWorkoutCompletionUseCase
+import dev.wwade.workout.domain.backup.DriveBackupAccessTokenProvider
+import dev.wwade.workout.domain.backup.DriveBackupRepository
+import dev.wwade.workout.domain.backup.DriveBackupSettings
+import dev.wwade.workout.domain.backup.DriveBackupSettingsRepository
+import dev.wwade.workout.domain.backup.DriveBackupSnapshot
+import dev.wwade.workout.domain.backup.ListDriveBackupSnapshotsUseCase
+import dev.wwade.workout.domain.backup.RestoreDriveBackupUseCase
+import dev.wwade.workout.domain.backup.SetDriveBackupEnabledUseCase
 import dev.wwade.workout.domain.exporter.ExportWorkoutDataUseCase
 import dev.wwade.workout.domain.importer.ImportWorkoutsUseCase
 import dev.wwade.workout.domain.model.CircuitDraft
@@ -47,6 +56,8 @@ import dev.wwade.workout.ui.theme.WorkoutTheme
 import dev.wwade.workout.ui.viewmodel.ActiveSessionViewModel
 import dev.wwade.workout.ui.viewmodel.SessionSummaryViewModel
 import dev.wwade.workout.ui.viewmodel.WorkoutListViewModel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -403,5 +414,60 @@ class MultiWorkoutPrefillUserFlowTest {
                 workoutRepository = workoutRepository,
                 importRepository = RoomWorkoutDataImportRepository(database),
             )
+
+        override val driveBackupSettingsRepository: DriveBackupSettingsRepository = NoOpDriveBackupSettingsRepository()
+
+        private val driveBackupRepository: DriveBackupRepository = NoOpDriveBackupRepository()
+
+        override val setDriveBackupEnabledUseCase: SetDriveBackupEnabledUseCase =
+            SetDriveBackupEnabledUseCase(driveBackupSettingsRepository)
+
+        override val backupNowAfterWorkoutCompletionUseCase: BackupNowAfterWorkoutCompletionUseCase =
+            BackupNowAfterWorkoutCompletionUseCase(
+                exportWorkoutDataUseCase = exportWorkoutDataUseCase,
+                driveBackupRepository = driveBackupRepository,
+                settingsRepository = driveBackupSettingsRepository,
+                accessTokenProvider = object : DriveBackupAccessTokenProvider {
+                    override suspend fun getAccessTokenOrNull(): String? = null
+                },
+            )
+
+        override val listDriveBackupSnapshotsUseCase: ListDriveBackupSnapshotsUseCase =
+            ListDriveBackupSnapshotsUseCase(driveBackupRepository)
+
+        override val restoreDriveBackupUseCase: RestoreDriveBackupUseCase =
+            RestoreDriveBackupUseCase(
+                driveBackupRepository = driveBackupRepository,
+                importWorkoutsUseCase = importWorkoutsUseCase,
+            )
+    }
+
+    private class NoOpDriveBackupSettingsRepository : DriveBackupSettingsRepository {
+        override fun observeSettings(): Flow<DriveBackupSettings> = flowOf(DriveBackupSettings())
+        override suspend fun getSettings(): DriveBackupSettings = DriveBackupSettings()
+        override suspend fun setEnabled(enabled: Boolean) = Unit
+        override suspend fun recordBackupSuccess(snapshot: DriveBackupSnapshot) = Unit
+        override suspend fun recordBackupFailure(message: String) = Unit
+    }
+
+    private class NoOpDriveBackupRepository : DriveBackupRepository {
+        override suspend fun uploadSnapshot(
+            accessToken: String,
+            fileName: String,
+            exportedAt: Long,
+            json: String,
+        ): DriveBackupSnapshot = DriveBackupSnapshot(
+            id = "noop",
+            fileName = fileName,
+            exportedAt = exportedAt,
+            modifiedTime = exportedAt,
+            sizeBytes = json.length.toLong(),
+        )
+
+        override suspend fun listSnapshots(accessToken: String): List<DriveBackupSnapshot> = emptyList()
+
+        override suspend fun downloadSnapshot(accessToken: String, snapshotId: String): String = "{}"
+
+        override suspend fun deleteSnapshot(accessToken: String, snapshotId: String) = Unit
     }
 }

@@ -6,6 +6,7 @@ import dev.wwade.workout.domain.model.ExerciseSetHistoryItem
 import dev.wwade.workout.domain.model.ExerciseProgressSnapshot
 import dev.wwade.workout.domain.model.LoadUnit
 import dev.wwade.workout.domain.model.SetEntryDraft
+import dev.wwade.workout.domain.backup.BackupNowAfterWorkoutCompletionUseCase
 import dev.wwade.workout.domain.repository.SessionRepository
 import dev.wwade.workout.domain.usecase.SessionProgressCalculator
 import dev.wwade.workout.ui.state.ActiveExerciseCardState
@@ -22,10 +23,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 class ActiveSessionViewModel(
     private val sessionRepository: SessionRepository,
     private val sessionId: Long,
+    private val backupNowAfterWorkoutCompletionUseCase: BackupNowAfterWorkoutCompletionUseCase? = null,
 ) : ViewModel() {
     private val overrides = MutableStateFlow<Map<RoundKey, Map<Long, EditableEntry>>>(emptyMap())
     private val selectedPosition = MutableStateFlow<SessionProgressCalculator.CurrentPosition?>(null)
@@ -221,11 +224,16 @@ class ActiveSessionViewModel(
             )
         }
 
-        sessionRepository.saveRoundEntries(sessionId = sessionId, entries = entries)
+        val newlyCompleted = sessionRepository.saveRoundEntries(sessionId = sessionId, entries = entries)
         val savedRoundKey = current.currentRoundKey()
         overrides.update { it - savedRoundKey }
         selectedPosition.value = null
         transientUiState.update { it.copy(isSaving = false, errorMessage = null) }
+        if (newlyCompleted) {
+            viewModelScope.launch {
+                backupNowAfterWorkoutCompletionUseCase?.invoke()
+            }
+        }
     }
 
     suspend fun abandonSession() {

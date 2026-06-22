@@ -1,7 +1,9 @@
 package dev.wwade.workout.ui.screen
 
+import android.app.Activity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -11,12 +13,14 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
@@ -50,10 +54,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.google.android.gms.auth.api.identity.AuthorizationRequest
+import com.google.android.gms.auth.api.identity.Identity
+import com.google.android.gms.common.api.Scope
+import com.google.android.gms.common.api.ApiException
+import dev.wwade.workout.domain.backup.DRIVE_APPDATA_SCOPE
+import dev.wwade.workout.domain.backup.DriveBackupSnapshot
 import dev.wwade.workout.domain.model.WorkoutListItem
+import dev.wwade.workout.ui.state.DriveBackupAuthorizationAction
+import dev.wwade.workout.ui.state.DriveBackupDialog
 import dev.wwade.workout.ui.state.WorkoutImportDialog
 import dev.wwade.workout.ui.state.WorkoutListState
 import dev.wwade.workout.ui.viewmodel.WorkoutExportFile
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -84,13 +99,84 @@ fun WorkoutListScreen(
     onImportFromJson: (String) -> Unit,
     onImportFileReadFailed: (String) -> Unit,
     onDismissImportMessage: () -> Unit,
+    onShowDriveBackupOptions: () -> Unit = {},
+    onHideDriveBackupDialog: () -> Unit = {},
+    onDisableDriveBackup: () -> Unit = {},
+    onDriveAuthorizationToken: (DriveBackupAuthorizationAction, String) -> Unit = { _, _ -> },
+    onDriveAuthorizationFailed: (String) -> Unit = {},
+    onRequestRestoreDriveBackup: (String) -> Unit = {},
+    onCancelRestoreDriveBackup: () -> Unit = {},
+    onConfirmRestoreDriveBackup: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var pendingExport by remember { mutableStateOf<WorkoutExportFile?>(null) }
     var pendingActiveWorkoutEditId by remember { mutableStateOf<Long?>(null) }
+    var pendingDriveAction by remember { mutableStateOf<DriveBackupAuthorizationAction?>(null) }
 
     BackHandler(enabled = state.isSelectionMode, onBack = onClearSelection)
+
+    val startDriveAuthorizationIntent = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result ->
+        val action = pendingDriveAction
+        pendingDriveAction = null
+        if (action == null) return@rememberLauncherForActivityResult
+
+        runCatching {
+            Identity.getAuthorizationClient(context).getAuthorizationResultFromIntent(result.data)
+        }.onSuccess { authorizationResult ->
+            val accessToken = authorizationResult.accessToken
+            if (accessToken.isNullOrBlank()) {
+                onDriveAuthorizationFailed("Google Drive permission did not return an access token.")
+            } else {
+                onDriveAuthorizationToken(action, accessToken)
+            }
+        }.onFailure { error ->
+            val message = if (error is ApiException) {
+                error.message ?: "Google Drive permission was not granted."
+            } else {
+                "Google Drive permission was not granted."
+            }
+            onDriveAuthorizationFailed(message)
+        }
+    }
+
+    fun requestDriveAuthorization(action: DriveBackupAuthorizationAction) {
+        val activity = context as? Activity
+        if (activity == null) {
+            onDriveAuthorizationFailed("Drive backup needs an Android activity.")
+            return
+        }
+        val request = AuthorizationRequest.builder()
+            .setRequestedScopes(listOf(Scope(DRIVE_APPDATA_SCOPE)))
+            .build()
+        Identity.getAuthorizationClient(activity)
+            .authorize(request)
+            .addOnSuccessListener { result ->
+                if (result.hasResolution()) {
+                    val pendingIntent = result.pendingIntent
+                    if (pendingIntent == null) {
+                        onDriveAuthorizationFailed("Unable to open Google Drive permission.")
+                    } else {
+                        pendingDriveAction = action
+                        startDriveAuthorizationIntent.launch(
+                            IntentSenderRequest.Builder(pendingIntent.intentSender).build(),
+                        )
+                    }
+                } else {
+                    val accessToken = result.accessToken
+                    if (accessToken.isNullOrBlank()) {
+                        onDriveAuthorizationFailed("Google Drive permission did not return an access token.")
+                    } else {
+                        onDriveAuthorizationToken(action, accessToken)
+                    }
+                }
+            }
+            .addOnFailureListener { error ->
+                onDriveAuthorizationFailed(error.message ?: "Unable to request Google Drive permission.")
+            }
+    }
 
     val importFileLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
@@ -171,6 +257,12 @@ fun WorkoutListScreen(
                             enabled = !state.isImporting && !state.isExporting,
                         ) {
                             Icon(Icons.Default.FileUpload, contentDescription = "Import data")
+                        }
+                        IconButton(
+                            onClick = onShowDriveBackupOptions,
+                            enabled = !state.isImporting && !state.isExporting && !state.isDriveBackupBusy,
+                        ) {
+                            Icon(Icons.Default.CloudSync, contentDescription = "Drive backup")
                         }
                         IconButton(onClick = onOpenHistory) {
                             Icon(Icons.Default.History, contentDescription = "History")
@@ -322,6 +414,130 @@ fun WorkoutListScreen(
             )
         }
     }
+
+    when (state.driveBackupDialog) {
+        DriveBackupDialog.None -> Unit
+        DriveBackupDialog.Options -> {
+            AlertDialog(
+                onDismissRequest = onHideDriveBackupDialog,
+                title = { Text("Drive backup") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            if (state.driveBackupSettings.enabled) {
+                                "Automatic Drive backup is enabled."
+                            } else {
+                                "Automatic Drive backup is disabled."
+                            },
+                        )
+                        state.driveBackupSettings.lastSuccessAt?.let { lastSuccessAt ->
+                            Text("Last backup: ${formatDriveBackupTime(lastSuccessAt)}")
+                        }
+                        state.driveBackupSettings.lastFailureMessage?.let { failure ->
+                            Text(
+                                text = failure,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    if (state.driveBackupSettings.enabled) {
+                        TextButton(onClick = onDisableDriveBackup) {
+                            Text("Disable")
+                        }
+                    } else {
+                        Button(
+                            onClick = {
+                                requestDriveAuthorization(DriveBackupAuthorizationAction.Enable)
+                            },
+                            enabled = !state.isDriveBackupBusy,
+                        ) {
+                            Text("Enable")
+                        }
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            requestDriveAuthorization(DriveBackupAuthorizationAction.ListSnapshots)
+                        },
+                        enabled = !state.isDriveBackupBusy,
+                    ) {
+                        Text("Restore")
+                    }
+                },
+            )
+        }
+
+        DriveBackupDialog.Snapshots -> {
+            AlertDialog(
+                onDismissRequest = onHideDriveBackupDialog,
+                title = { Text("Restore from Drive") },
+                text = {
+                    if (state.driveBackupSnapshots.isEmpty()) {
+                        Text("No Drive backups were found.")
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.heightIn(max = 360.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            items(state.driveBackupSnapshots, key = { it.id }) { snapshot ->
+                                TextButton(
+                                    onClick = { onRequestRestoreDriveBackup(snapshot.id) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Column(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                                    ) {
+                                        Text(formatDriveBackupTime(snapshot.exportedAt))
+                                        Text(
+                                            text = snapshot.sizeBytes?.let(::formatDriveBackupSize)
+                                                ?: snapshot.fileName,
+                                            style = MaterialTheme.typography.bodySmall,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = onHideDriveBackupDialog) {
+                        Text("Close")
+                    }
+                },
+            )
+        }
+
+        DriveBackupDialog.ConfirmRestore -> {
+            val snapshot = state.pendingRestoreSnapshot
+            AlertDialog(
+                onDismissRequest = onCancelRestoreDriveBackup,
+                title = { Text("Restore backup?") },
+                text = {
+                    Text(
+                        "This will replace current workout data with " +
+                            "${snapshot?.let { formatDriveBackupTime(it.exportedAt) } ?: "the selected backup"}.",
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = onConfirmRestoreDriveBackup,
+                        enabled = !state.isDriveBackupBusy,
+                    ) {
+                        Text("Restore")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = onCancelRestoreDriveBackup) {
+                        Text("Cancel")
+                    }
+                },
+            )
+        }
+    }
 }
 
 @Composable
@@ -345,6 +561,10 @@ private fun WorkoutListContent(
         }
 
         if (state.isExporting) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+
+        if (state.isDriveBackupBusy) {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         }
 
@@ -519,3 +739,20 @@ private fun WorkoutRow(
         }
     }
 }
+
+private fun formatDriveBackupTime(epochMillis: Long): String {
+    return DriveBackupDateFormatter.format(
+        Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()),
+    )
+}
+
+private fun formatDriveBackupSize(sizeBytes: Long): String {
+    return when {
+        sizeBytes >= 1_000_000 -> "${sizeBytes / 1_000_000} MB"
+        sizeBytes >= 1_000 -> "${sizeBytes / 1_000} KB"
+        else -> "$sizeBytes bytes"
+    }
+}
+
+private val DriveBackupDateFormatter: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a")
