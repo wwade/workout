@@ -31,7 +31,7 @@ From Android Studio:
 - Run app
 - Run unit tests
 - Run instrumentation tests
-- Prefer the `e2e` build variant for device-backed integration runs
+- Use the debug Android test variant for device-backed instrumentation runs
 
 From a terminal, once Gradle is available:
 
@@ -40,7 +40,7 @@ From a terminal, once Gradle is available:
 ./gradlew connectedAndroidTest
 ./gradlew assembleDebug
 ./gradlew assembleE2e
-./gradlew connectedE2eAndroidTest
+./gradlew app:connectedDebugAndroidTest
 ```
 
 On Windows with the wrapper present:
@@ -50,7 +50,7 @@ On Windows with the wrapper present:
 .\gradlew.bat connectedAndroidTest
 .\gradlew.bat assembleDebug
 .\gradlew.bat assembleE2e
-.\gradlew.bat connectedE2eAndroidTest
+.\gradlew.bat app:connectedDebugAndroidTest
 ```
 
 Build identities:
@@ -59,7 +59,7 @@ Build identities:
 - `debug`: `dev.wwade.workout.debug`
 - `e2e`: `dev.wwade.workout.e2e`
 
-Use `connectedE2eAndroidTest` when you want instrumentation tests to run against the dedicated `e2e` app install instead of the regular debug install.
+Instrumentation tests currently live under the debug Android test variant and are run with `app:connectedDebugAndroidTest` or `connectedAndroidTest`. The `e2e` build variant assembles a dedicated app id, but this Gradle project does not currently expose an e2e-specific connected Android test task.
 
 ## Architecture
 

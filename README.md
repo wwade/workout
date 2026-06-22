@@ -156,7 +156,7 @@ The app uses a single `app` module and is split into three main layers:
 3. Run `./gradlew testDebugUnitTest` or let Android Studio sync the project.
 4. Run the `app` configuration on an emulator or Android device.
 
-For device-backed integration runs, prefer the dedicated `e2e` build so tests do not touch the debug app's data. Use `./gradlew connectedE2eAndroidTest`.
+For device-backed instrumentation runs, use `./gradlew app:connectedDebugAndroidTest` with a connected emulator or device. The `e2e` build variant can still be assembled separately with `./gradlew assembleE2e`, but this Gradle project does not currently expose an e2e-specific connected Android test task.
 
 ## Current Status
 
