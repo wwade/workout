@@ -7,13 +7,16 @@ import dev.wwade.workout.data.db.MIGRATION_2_3
 import dev.wwade.workout.data.db.MIGRATION_3_4
 import dev.wwade.workout.data.repository.RoomExerciseDefinitionRepository
 import dev.wwade.workout.data.repository.RoomWorkoutDataExportRepository
+import dev.wwade.workout.data.repository.RoomWorkoutDataImportRepository
 import dev.wwade.workout.data.repository.RoomSessionRepository
 import dev.wwade.workout.data.repository.RoomWorkoutRepository
 import dev.wwade.workout.domain.exporter.ExportWorkoutDataUseCase
+import dev.wwade.workout.domain.importer.ImportWorkoutsUseCase
 import dev.wwade.workout.domain.model.DefaultWorkoutDrafts
 import dev.wwade.workout.domain.repository.SessionRepository
 import dev.wwade.workout.domain.repository.ExerciseDefinitionRepository
 import dev.wwade.workout.domain.repository.WorkoutDataExportRepository
+import dev.wwade.workout.domain.repository.WorkoutDataImportRepository
 import dev.wwade.workout.domain.repository.WorkoutRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +38,7 @@ interface AppContainer {
     val workoutRepository: WorkoutRepository
     val sessionRepository: SessionRepository
     val exportWorkoutDataUseCase: ExportWorkoutDataUseCase
+    val importWorkoutsUseCase: ImportWorkoutsUseCase
 }
 
 private class DefaultAppContainer(
@@ -69,8 +73,17 @@ private class DefaultAppContainer(
             workoutSessionDao = database.workoutSessionDao(),
         )
 
+    private val workoutDataImportRepository: WorkoutDataImportRepository =
+        RoomWorkoutDataImportRepository(database)
+
     override val exportWorkoutDataUseCase: ExportWorkoutDataUseCase =
         ExportWorkoutDataUseCase(workoutDataExportRepository)
+
+    override val importWorkoutsUseCase: ImportWorkoutsUseCase =
+        ImportWorkoutsUseCase(
+            workoutRepository = workoutRepository,
+            importRepository = workoutDataImportRepository,
+        )
 
     init {
         if (BuildConfig.DEBUG) {

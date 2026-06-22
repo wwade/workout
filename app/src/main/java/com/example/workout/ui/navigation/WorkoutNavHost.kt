@@ -44,6 +44,7 @@ fun WorkoutNavHost(
                     WorkoutListViewModel(
                         workoutRepository = container.workoutRepository,
                         sessionRepository = container.sessionRepository,
+                        importWorkoutsUseCase = container.importWorkoutsUseCase,
                         exportWorkoutDataUseCase = container.exportWorkoutDataUseCase,
                     )
                 },

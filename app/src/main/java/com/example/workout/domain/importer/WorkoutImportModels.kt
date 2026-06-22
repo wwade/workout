@@ -13,16 +13,25 @@ data class WorkoutImportResult(
     val importedCount: Int,
     val failedCount: Int,
     val workoutErrors: List<String>,
+    val restoredCounts: WorkoutDataRestoreCounts? = null,
 ) {
     val isSuccess: Boolean
-        get() = importedCount > 0 && failedCount == 0
+        get() = restoredCounts != null || (importedCount > 0 && failedCount == 0)
 
     val isPartialSuccess: Boolean
         get() = importedCount > 0 && failedCount > 0
+
+    val isRestore: Boolean
+        get() = restoredCounts != null
 }
+
+data class WorkoutDataRestoreCounts(
+    val exerciseDefinitionCount: Int,
+    val workoutCount: Int,
+    val sessionCount: Int,
+)
 
 class WorkoutImportException(
     message: String,
     cause: Throwable? = null,
 ) : Exception(message, cause)
-

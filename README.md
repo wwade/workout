@@ -23,15 +23,16 @@ The app is built around two modes:
 - Review recent set history for an exercise while working out, including uses in other workouts
 - Import workout templates from a local JSON or YAML file, or a direct JSON/YAML URL
 - Export all templates and session history to a local JSON backup file
+- Restore a full JSON backup exported from the app
 
 ## Importing Workouts
 
-Use the Import action on the workout list screen to import workout templates from either:
+Use the Import action on the workout list screen to import workout data from either:
 
 - a local JSON or YAML file selected through Android's document picker
 - a direct-download URL that returns JSON or YAML
 
-Imports are template-only. They do not import session history or active workouts, and they never overwrite existing templates. If an imported workout has the same name as an existing workout, the app creates another copy with the imported name.
+Template imports are append-only. They do not import session history or active workouts, and they never overwrite existing templates. If an imported workout has the same name as an existing workout, the app creates another copy with the imported name.
 
 Imported exercises are matched to the exercise library by normalized name: leading/trailing whitespace is ignored, repeated whitespace is collapsed, and matching is case-insensitive. Matching exercises reuse the existing library entry, including archived entries. New exercise names create library entries, and imported guidance is saved on the workout exercise while also seeding default guidance for newly created library entries.
 
@@ -87,6 +88,8 @@ workouts:
 ```
 
 A single workout object with `name` and `circuits` is also accepted as a convenience in either JSON or YAML. Import validation uses the same rules as the workout editor.
+
+Full JSON backups exported by the app can also be imported from the same Import action. A full backup import is a restore: it replaces current workout data, including workout templates, exercise definitions, active sessions, completed sessions, snapshots, and set entries. Full backup import supports the JSON export schema only.
 
 ## Exporting Data
 

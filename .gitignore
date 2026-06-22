@@ -2,6 +2,7 @@
 .gradle-user/
 .gradle-user-ci-debug*/
 .gradle-user-import/
+.gradle-user-verify/
 .gradle-user-yaml/
 .idea/
 build/

@@ -136,7 +136,7 @@ fun WorkoutListScreen(
                         onClick = onShowImportOptions,
                         enabled = !state.isImporting && !state.isExporting,
                     ) {
-                        Icon(Icons.Default.FileUpload, contentDescription = "Import workouts")
+                        Icon(Icons.Default.FileUpload, contentDescription = "Import data")
                     }
                     IconButton(onClick = onOpenHistory) {
                         Icon(Icons.Default.History, contentDescription = "History")
@@ -169,8 +169,8 @@ fun WorkoutListScreen(
         WorkoutImportDialog.ChooseSource -> {
             AlertDialog(
                 onDismissRequest = onHideImportDialog,
-                title = { Text("Import workouts") },
-                text = { Text("Choose a JSON or YAML source to import workout templates.") },
+                title = { Text("Import data") },
+                text = { Text("Choose a JSON or YAML workout-template source, or a JSON backup exported from this app.") },
                 confirmButton = {
                     Button(
                         onClick = {

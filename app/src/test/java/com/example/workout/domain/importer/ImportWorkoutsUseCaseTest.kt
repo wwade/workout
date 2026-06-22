@@ -3,6 +3,7 @@ package dev.wwade.workout.domain.importer
 import dev.wwade.workout.domain.model.WorkoutDraft
 import dev.wwade.workout.domain.model.WorkoutListItem
 import dev.wwade.workout.domain.model.WorkoutTemplate
+import dev.wwade.workout.domain.repository.WorkoutDataImportRepository
 import dev.wwade.workout.domain.repository.WorkoutRepository
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.Flow
@@ -104,6 +105,29 @@ class ImportWorkoutsUseCaseTest {
         assertThat(result.importedCount).isEqualTo(1)
         assertThat(repository.savedWorkouts.single().name).isEqualTo("Remote")
     }
+
+    @Test
+    fun restoresFullBackupUsingImportRepository() = runTest {
+        val repository = FakeWorkoutRepository()
+        val importRepository = FakeWorkoutDataImportRepository()
+        val useCase = ImportWorkoutsUseCase(
+            workoutRepository = repository,
+            importRepository = importRepository,
+        )
+
+        val result = useCase(
+            WorkoutImportRequest(
+                WorkoutImportSource.RawJson(validWorkoutDataBackupJson()),
+            ),
+        )
+
+        assertThat(repository.savedWorkouts).isEmpty()
+        assertThat(importRepository.restoredSnapshot?.workouts?.single()?.name).isEqualTo("Push Day")
+        assertThat(result.importedCount).isEqualTo(0)
+        assertThat(result.restoredCounts?.exerciseDefinitionCount).isEqualTo(1)
+        assertThat(result.restoredCounts?.workoutCount).isEqualTo(1)
+        assertThat(result.restoredCounts?.sessionCount).isEqualTo(1)
+    }
 }
 
 internal class FakeWorkoutRepository(
@@ -128,3 +152,16 @@ private fun validDraft(name: String): WorkoutDraft {
     return WorkoutImportParser().parse(validSingleWorkoutJson(name)).single()
 }
 
+private class FakeWorkoutDataImportRepository : WorkoutDataImportRepository {
+    var restoredSnapshot: WorkoutDataRestoreSnapshot? = null
+        private set
+
+    override suspend fun restoreSnapshot(snapshot: WorkoutDataRestoreSnapshot): WorkoutDataRestoreCounts {
+        restoredSnapshot = snapshot
+        return WorkoutDataRestoreCounts(
+            exerciseDefinitionCount = snapshot.exerciseDefinitions.size,
+            workoutCount = snapshot.workouts.size,
+            sessionCount = snapshot.sessions.size,
+        )
+    }
+}

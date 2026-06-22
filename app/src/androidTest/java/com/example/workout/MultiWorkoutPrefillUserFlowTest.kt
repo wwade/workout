@@ -26,8 +26,10 @@ import dev.wwade.workout.data.db.AppDatabase
 import dev.wwade.workout.data.repository.RoomExerciseDefinitionRepository
 import dev.wwade.workout.data.repository.RoomSessionRepository
 import dev.wwade.workout.data.repository.RoomWorkoutDataExportRepository
+import dev.wwade.workout.data.repository.RoomWorkoutDataImportRepository
 import dev.wwade.workout.data.repository.RoomWorkoutRepository
 import dev.wwade.workout.domain.exporter.ExportWorkoutDataUseCase
+import dev.wwade.workout.domain.importer.ImportWorkoutsUseCase
 import dev.wwade.workout.domain.model.CircuitDraft
 import dev.wwade.workout.domain.model.ExerciseDraft
 import dev.wwade.workout.domain.model.SessionStatus
@@ -262,6 +264,7 @@ class MultiWorkoutPrefillUserFlowTest {
                     WorkoutListViewModel(
                         workoutRepository = container.workoutRepository,
                         sessionRepository = container.sessionRepository,
+                        importWorkoutsUseCase = container.importWorkoutsUseCase,
                         exportWorkoutDataUseCase = container.exportWorkoutDataUseCase,
                     )
                 }
@@ -368,6 +371,12 @@ class MultiWorkoutPrefillUserFlowTest {
                     workoutTemplateDao = database.workoutTemplateDao(),
                     workoutSessionDao = database.workoutSessionDao(),
                 ),
+            )
+
+        override val importWorkoutsUseCase: ImportWorkoutsUseCase =
+            ImportWorkoutsUseCase(
+                workoutRepository = workoutRepository,
+                importRepository = RoomWorkoutDataImportRepository(database),
             )
     }
 }

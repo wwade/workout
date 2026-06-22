@@ -9,7 +9,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.snakeyaml.engine.v2.api.Load
 import org.snakeyaml.engine.v2.api.LoadSettings
 
@@ -25,12 +27,25 @@ class WorkoutImportParser {
     )
 
     fun parse(rawPayload: String): List<WorkoutDraft> {
+        return when (val parsedImport = parseImport(rawPayload)) {
+            is ParsedWorkoutImport.TemplateWorkouts -> parsedImport.workouts
+            is ParsedWorkoutImport.FullBackup -> {
+                throw WorkoutImportException("Full backup JSON must be imported as workout data.")
+            }
+        }
+    }
+
+    fun parseImport(rawPayload: String): ParsedWorkoutImport {
         val payload = if (rawPayload.trimStart().startsWith("{")) {
             parseJson(rawPayload)
         } else {
-            parseYaml(rawPayload)
+            ParsedWorkoutImport.TemplateWorkouts(parseWorkoutPayload(parseYaml(rawPayload)))
         }
 
+        return payload
+    }
+
+    private fun parseWorkoutPayload(payload: WorkoutImportPayloadDto): List<WorkoutDraft> {
         if (payload.workouts.isEmpty()) {
             throw WorkoutImportException("Workout import must include at least one workout.")
         }
@@ -40,13 +55,17 @@ class WorkoutImportParser {
         }
     }
 
-    private fun parseJson(rawJson: String): WorkoutImportPayloadDto {
+    private fun parseJson(rawJson: String): ParsedWorkoutImport {
         val root = runCatching { json.parseToJsonElement(rawJson).jsonObject }
             .getOrElse { error ->
                 throw WorkoutImportException("The selected file is not valid workout JSON.", error)
             }
 
-        return runCatching {
+        if (root.containsKey("schemaVersion")) {
+            return ParsedWorkoutImport.FullBackup(parseFullBackup(root))
+        }
+
+        val payload = runCatching {
             if (root.containsKey("workouts")) {
                 json.decodeFromJsonElement<WorkoutImportPayloadDto>(root)
             } else {
@@ -59,6 +78,7 @@ class WorkoutImportParser {
             }
             throw WorkoutImportException(message, error)
         }
+        return ParsedWorkoutImport.TemplateWorkouts(parseWorkoutPayload(payload))
     }
 
     private fun parseYaml(rawYaml: String): WorkoutImportPayloadDto {
@@ -86,6 +106,33 @@ class WorkoutImportParser {
             }
             throw WorkoutImportException("Workout YAML does not match the import schema.", error)
         }
+    }
+
+    private fun parseFullBackup(
+        root: kotlinx.serialization.json.JsonObject,
+    ): WorkoutDataRestoreSnapshot {
+        val schemaVersion = root["schemaVersion"]?.jsonPrimitive?.intOrNull
+            ?: throw WorkoutImportException("Workout data backup JSON is missing schemaVersion.")
+        if (schemaVersion != 2) {
+            throw WorkoutImportException("Unsupported workout data backup schemaVersion $schemaVersion.")
+        }
+        val requiredCollections = listOf("exerciseDefinitions", "workouts", "sessions")
+        val missingCollection = requiredCollections.firstOrNull { !root.containsKey(it) }
+        if (missingCollection != null) {
+            throw WorkoutImportException("Workout data backup JSON is missing $missingCollection.")
+        }
+
+        val dto = runCatching {
+            json.decodeFromJsonElement<WorkoutDataImportDto>(root)
+        }.getOrElse { error ->
+            val message = when (error) {
+                is SerializationException -> "Workout data backup JSON does not match the export schema."
+                else -> "Unable to read the workout data backup JSON."
+            }
+            throw WorkoutImportException(message, error)
+        }
+
+        return dto.toSnapshot().also { it.validate() }
     }
 }
 
@@ -161,6 +208,110 @@ private inline fun <reified T : Enum<T>> Map<*, *>.optionalEnum(key: String, def
         ?: throw WorkoutImportException("Workout YAML field $key has an unknown value.")
 }
 
+private fun WorkoutDataRestoreSnapshot.validate() {
+    val exerciseDefinitionIds = exerciseDefinitions.map { it.id }.toSet()
+    requireUniqueIds("exercise definitions", "exercise definition", exerciseDefinitions.map { it.id })
+
+    val workoutIds = workouts.map { it.id }.toSet()
+    requireUniqueIds("workouts", "workout", workouts.map { it.id })
+
+    val circuits = workouts.flatMap { workout ->
+        workout.circuits.onEach { circuit ->
+            if (circuit.workoutId != workout.id) {
+                throw WorkoutImportException(
+                    "Circuit ${circuit.id} references workout ${circuit.workoutId}, expected ${workout.id}.",
+                )
+            }
+        }
+    }
+    val circuitIds = circuits.map { it.id }.toSet()
+    requireUniqueIds("circuits", "circuit", circuits.map { it.id })
+
+    val exerciseTemplates = circuits.flatMap { circuit ->
+        circuit.exercises.onEach { exercise ->
+            if (exercise.circuitId != circuit.id) {
+                throw WorkoutImportException(
+                    "Exercise template ${exercise.id} references circuit ${exercise.circuitId}, expected ${circuit.id}.",
+                )
+            }
+            if (exercise.exerciseDefinitionId !in exerciseDefinitionIds) {
+                throw WorkoutImportException(
+                    "Exercise template ${exercise.id} references missing exercise definition ${exercise.exerciseDefinitionId}.",
+                )
+            }
+        }
+    }
+    val exerciseTemplateIds = exerciseTemplates.map { it.id }.toSet()
+    requireUniqueIds("exercise templates", "exercise template", exerciseTemplates.map { it.id })
+
+    requireUniqueIds("sessions", "session", sessions.map { it.sessionId })
+    sessions.forEach { session ->
+        session.workoutTemplateId?.let { workoutTemplateId ->
+            if (workoutTemplateId !in workoutIds) {
+                throw WorkoutImportException("Session ${session.sessionId} references missing workout $workoutTemplateId.")
+            }
+        }
+    }
+
+    val circuitSessions = sessions.flatMap { it.circuits }
+    requireUniqueIds("circuit sessions", "circuit session", circuitSessions.map { it.circuitSessionId })
+    circuitSessions.forEach { circuit ->
+        circuit.circuitTemplateId?.let { circuitTemplateId ->
+            if (circuitTemplateId !in circuitIds) {
+                throw WorkoutImportException(
+                    "Circuit session ${circuit.circuitSessionId} references missing circuit $circuitTemplateId.",
+                )
+            }
+        }
+    }
+
+    val exerciseSessions = circuitSessions.flatMap { circuit ->
+        circuit.exercises.onEach { exercise ->
+            exercise.exerciseTemplateId?.let { exerciseTemplateId ->
+                if (exerciseTemplateId !in exerciseTemplateIds) {
+                    throw WorkoutImportException(
+                        "Exercise session ${exercise.exerciseSessionId} references missing exercise template $exerciseTemplateId.",
+                    )
+                }
+            }
+            exercise.exerciseDefinitionId?.let { exerciseDefinitionId ->
+                if (exerciseDefinitionId !in exerciseDefinitionIds) {
+                    throw WorkoutImportException(
+                        "Exercise session ${exercise.exerciseSessionId} references missing exercise definition $exerciseDefinitionId.",
+                    )
+                }
+            }
+        }
+    }
+    val exerciseSessionIds = exerciseSessions.map { it.exerciseSessionId }.toSet()
+    requireUniqueIds("exercise sessions", "exercise session", exerciseSessions.map { it.exerciseSessionId })
+
+    val setEntries = exerciseSessions.flatMap { exercise ->
+        exercise.sets.onEach { set ->
+            if (set.exerciseSessionId != exercise.exerciseSessionId) {
+                throw WorkoutImportException(
+                    "Set entry ${set.id} references exercise session ${set.exerciseSessionId}, expected ${exercise.exerciseSessionId}.",
+                )
+            }
+            if (set.exerciseSessionId !in exerciseSessionIds) {
+                throw WorkoutImportException("Set entry ${set.id} references missing exercise session ${set.exerciseSessionId}.")
+            }
+        }
+    }
+    requireUniqueIds("set entries", "set entry", setEntries.map { it.id })
+}
+
+private fun requireUniqueIds(label: String, singularLabel: String, ids: List<Long>) {
+    val duplicate = ids.groupingBy { it }.eachCount().entries.firstOrNull { it.value > 1 }
+    if (duplicate != null) {
+        throw WorkoutImportException("Workout data backup has duplicate $singularLabel id ${duplicate.key}.")
+    }
+    val invalid = ids.firstOrNull { it <= 0 }
+    if (invalid != null) {
+        throw WorkoutImportException("Workout data backup has invalid $label id $invalid.")
+    }
+}
+
 @Serializable
 private data class WorkoutImportPayloadDto(
     val workouts: List<WorkoutImportWorkoutDto> = emptyList(),
@@ -219,6 +370,225 @@ private data class WorkoutImportExerciseDto(
             loadUnit = loadUnit,
             restTimeSeconds = restTimeSeconds,
             setCount = setCount,
+        )
+    }
+}
+
+@Serializable
+private data class WorkoutDataImportDto(
+    val schemaVersion: Int,
+    val exportedAt: Long,
+    val exerciseDefinitions: List<ExerciseDefinitionImportDto>,
+    val workouts: List<WorkoutTemplateImportDto>,
+    val sessions: List<WorkoutSessionImportDto>,
+) {
+    fun toSnapshot(): WorkoutDataRestoreSnapshot {
+        return WorkoutDataRestoreSnapshot(
+            exerciseDefinitions = exerciseDefinitions.map { it.toRow() },
+            workouts = workouts.map { it.toRow() },
+            sessions = sessions.map { it.toRow() },
+        )
+    }
+}
+
+@Serializable
+private data class ExerciseDefinitionImportDto(
+    val id: Long,
+    val name: String,
+    val defaultGuidance: String,
+    val archived: Boolean,
+    val createdAt: Long,
+    val updatedAt: Long,
+) {
+    fun toRow(): ExerciseDefinitionRestoreRow {
+        return ExerciseDefinitionRestoreRow(
+            id = id,
+            name = name,
+            defaultGuidance = defaultGuidance,
+            archived = archived,
+            createdAt = createdAt,
+            updatedAt = updatedAt,
+        )
+    }
+}
+
+@Serializable
+private data class WorkoutTemplateImportDto(
+    val id: Long,
+    val name: String,
+    val sortOrder: Int,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val circuits: List<CircuitTemplateImportDto>,
+) {
+    fun toRow(): WorkoutTemplateRestoreRow {
+        return WorkoutTemplateRestoreRow(
+            id = id,
+            name = name,
+            sortOrder = sortOrder,
+            createdAt = createdAt,
+            updatedAt = updatedAt,
+            circuits = circuits.map { it.toRow() },
+        )
+    }
+}
+
+@Serializable
+private data class CircuitTemplateImportDto(
+    val id: Long,
+    val workoutId: Long,
+    val name: String,
+    val sortOrder: Int,
+    val exercises: List<ExerciseTemplateImportDto>,
+) {
+    fun toRow(): CircuitTemplateRestoreRow {
+        return CircuitTemplateRestoreRow(
+            id = id,
+            workoutId = workoutId,
+            name = name,
+            sortOrder = sortOrder,
+            exercises = exercises.map { it.toRow() },
+        )
+    }
+}
+
+@Serializable
+private data class ExerciseTemplateImportDto(
+    val id: Long,
+    val circuitId: Long,
+    val exerciseDefinitionId: Long,
+    val name: String,
+    val guidance: String,
+    val guidanceOverride: String,
+    val repMin: Int,
+    val repMax: Int,
+    val loadKind: LoadKind,
+    val loadMin: Double,
+    val loadMax: Double,
+    val loadUnit: LoadUnit,
+    val restTimeSeconds: Int,
+    val setCount: Int,
+    val sortOrder: Int,
+) {
+    fun toRow(): ExerciseTemplateRestoreRow {
+        return ExerciseTemplateRestoreRow(
+            id = id,
+            circuitId = circuitId,
+            exerciseDefinitionId = exerciseDefinitionId,
+            guidance = guidanceOverride.ifBlank { guidance },
+            repMin = repMin,
+            repMax = repMax,
+            loadKind = loadKind,
+            loadMin = loadMin,
+            loadMax = loadMax,
+            loadUnit = loadUnit,
+            restTimeSeconds = restTimeSeconds,
+            setCount = setCount,
+            sortOrder = sortOrder,
+        )
+    }
+}
+
+@Serializable
+private data class WorkoutSessionImportDto(
+    val sessionId: Long,
+    val workoutTemplateId: Long?,
+    val workoutName: String,
+    val startedAt: Long,
+    val completedAt: Long?,
+    val status: dev.wwade.workout.domain.model.SessionStatus,
+    val circuits: List<CircuitSessionImportDto>,
+) {
+    fun toRow(): WorkoutSessionRestoreRow {
+        return WorkoutSessionRestoreRow(
+            sessionId = sessionId,
+            workoutTemplateId = workoutTemplateId,
+            workoutName = workoutName,
+            startedAt = startedAt,
+            completedAt = completedAt,
+            status = status,
+            circuits = circuits.map { it.toRow() },
+        )
+    }
+}
+
+@Serializable
+private data class CircuitSessionImportDto(
+    val circuitSessionId: Long,
+    val circuitTemplateId: Long?,
+    val name: String,
+    val sortOrder: Int,
+    val setCount: Int,
+    val exercises: List<ExerciseSessionImportDto>,
+) {
+    fun toRow(): CircuitSessionRestoreRow {
+        return CircuitSessionRestoreRow(
+            circuitSessionId = circuitSessionId,
+            circuitTemplateId = circuitTemplateId,
+            name = name,
+            sortOrder = sortOrder,
+            setCount = setCount,
+            exercises = exercises.map { it.toRow() },
+        )
+    }
+}
+
+@Serializable
+private data class ExerciseSessionImportDto(
+    val exerciseSessionId: Long,
+    val exerciseTemplateId: Long?,
+    val exerciseDefinitionId: Long?,
+    val name: String,
+    val guidance: String,
+    val repMin: Int,
+    val repMax: Int,
+    val loadKind: LoadKind,
+    val loadMin: Double,
+    val loadMax: Double,
+    val loadUnit: LoadUnit,
+    val restTimeSeconds: Int,
+    val sortOrder: Int,
+    val sets: List<SetEntryImportDto>,
+) {
+    fun toRow(): ExerciseSessionRestoreRow {
+        return ExerciseSessionRestoreRow(
+            exerciseSessionId = exerciseSessionId,
+            exerciseTemplateId = exerciseTemplateId,
+            exerciseDefinitionId = exerciseDefinitionId,
+            name = name,
+            guidance = guidance,
+            repMin = repMin,
+            repMax = repMax,
+            loadKind = loadKind,
+            loadMin = loadMin,
+            loadMax = loadMax,
+            loadUnit = loadUnit,
+            restTimeSeconds = restTimeSeconds,
+            sortOrder = sortOrder,
+            sets = sets.map { it.toRow() },
+        )
+    }
+}
+
+@Serializable
+private data class SetEntryImportDto(
+    val id: Long,
+    val exerciseSessionId: Long,
+    val setIndex: Int,
+    val repsActual: Int?,
+    val loadActual: Double?,
+    val notes: String,
+    val skipped: Boolean,
+) {
+    fun toRow(): SetEntryRestoreRow {
+        return SetEntryRestoreRow(
+            id = id,
+            exerciseSessionId = exerciseSessionId,
+            setIndex = setIndex,
+            repsActual = repsActual,
+            loadActual = loadActual,
+            notes = notes,
+            skipped = skipped,
         )
     }
 }

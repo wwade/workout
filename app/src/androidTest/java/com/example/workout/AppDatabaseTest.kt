@@ -11,6 +11,11 @@ import dev.wwade.workout.data.db.AppDatabase
 import dev.wwade.workout.data.db.MIGRATION_2_3
 import dev.wwade.workout.data.db.MIGRATION_3_4
 import dev.wwade.workout.data.db.SetEntryEntity
+import dev.wwade.workout.data.repository.RoomWorkoutDataImportRepository
+import dev.wwade.workout.data.repository.RoomWorkoutRepository
+import dev.wwade.workout.domain.importer.ImportWorkoutsUseCase
+import dev.wwade.workout.domain.importer.WorkoutImportRequest
+import dev.wwade.workout.domain.importer.WorkoutImportSource
 import dev.wwade.workout.domain.model.CircuitDraft
 import dev.wwade.workout.domain.model.ExerciseDraft
 import dev.wwade.workout.domain.model.SessionStatus
@@ -150,6 +155,52 @@ class AppDatabaseTest {
             SessionStatus.IN_PROGRESS,
             SessionStatus.COMPLETED,
         ).inOrder()
+    }
+
+    @Test
+    fun fullBackupImportReplacesExistingDataAndRestoresRelationships() = runBlocking {
+        database.workoutTemplateDao().upsertWorkoutGraph(
+            WorkoutDraft(
+                name = "Existing",
+                circuits = listOf(
+                    CircuitDraft(
+                        name = "Old",
+                        exercises = listOf(ExerciseDraft(name = "Old Press")),
+                    ),
+                ),
+            ),
+        )
+        val useCase = ImportWorkoutsUseCase(
+            workoutRepository = RoomWorkoutRepository(database.workoutTemplateDao()),
+            importRepository = RoomWorkoutDataImportRepository(database),
+        )
+
+        val result = useCase(
+            WorkoutImportRequest(
+                WorkoutImportSource.RawJson(validWorkoutDataBackupJson()),
+            ),
+        )
+
+        assertThat(result.restoredCounts?.exerciseDefinitionCount).isEqualTo(1)
+        assertThat(result.restoredCounts?.workoutCount).isEqualTo(1)
+        assertThat(result.restoredCounts?.sessionCount).isEqualTo(1)
+
+        val workouts = database.workoutTemplateDao().getAllWorkoutTemplateGraphs()
+        assertThat(workouts.map { it.workout.name }).containsExactly("Push Day")
+        assertThat(workouts.single().workout.id).isEqualTo(1L)
+        assertThat(workouts.single().circuits.single().circuit.id).isEqualTo(2L)
+        assertThat(workouts.single().circuits.single().exercises.single().exercise.id).isEqualTo(3L)
+        assertThat(workouts.single().circuits.single().exercises.single().definition.id).isEqualTo(30L)
+
+        val session = database.workoutSessionDao().getSessionDetail(11L)
+        assertThat(session?.session?.workoutNameSnapshot).isEqualTo("Push Day")
+        assertThat(session?.circuits?.single()?.circuit?.id).isEqualTo(12L)
+        val restoredExercise = session?.circuits?.single()?.exercises?.single()
+        assertThat(restoredExercise?.exercise?.id).isEqualTo(13L)
+        assertThat(restoredExercise?.exercise?.exerciseTemplateId).isEqualTo(3L)
+        assertThat(restoredExercise?.exercise?.exerciseDefinitionId).isEqualTo(30L)
+        assertThat(restoredExercise?.sets?.single()?.id).isEqualTo(14L)
+        assertThat(restoredExercise?.sets?.single()?.notes).isEqualTo("Felt good")
     }
 
     @Test
@@ -368,4 +419,106 @@ class AppDatabaseTest {
         }
         return sessionId
     }
+}
+
+private fun validWorkoutDataBackupJson(): String {
+    return """
+        {
+          "schemaVersion": 2,
+          "exportedAt": 1782000000000,
+          "exerciseDefinitions": [
+            {
+              "id": 30,
+              "name": "Press",
+              "defaultGuidance": "Control the eccentric",
+              "archived": false,
+              "createdAt": 10,
+              "updatedAt": 20
+            }
+          ],
+          "workouts": [
+            {
+              "id": 1,
+              "name": "Push Day",
+              "sortOrder": 0,
+              "createdAt": 10,
+              "updatedAt": 20,
+              "circuits": [
+                {
+                  "id": 2,
+                  "workoutId": 1,
+                  "name": "Cycle 1",
+                  "sortOrder": 0,
+                  "exercises": [
+                    {
+                      "id": 3,
+                      "circuitId": 2,
+                      "exerciseDefinitionId": 30,
+                      "name": "Press",
+                      "guidance": "Control the eccentric",
+                      "guidanceOverride": "Control the eccentric",
+                      "repMin": 6,
+                      "repMax": 8,
+                      "loadKind": "WEIGHT",
+                      "loadMin": 40.0,
+                      "loadMax": 60.0,
+                      "loadUnit": "LB",
+                      "restTimeSeconds": 90,
+                      "setCount": 3,
+                      "sortOrder": 0
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "sessions": [
+            {
+              "sessionId": 11,
+              "workoutTemplateId": 1,
+              "workoutName": "Push Day",
+              "startedAt": 100,
+              "completedAt": 200,
+              "status": "COMPLETED",
+              "circuits": [
+                {
+                  "circuitSessionId": 12,
+                  "circuitTemplateId": 2,
+                  "name": "Cycle 1",
+                  "sortOrder": 0,
+                  "setCount": 3,
+                  "exercises": [
+                    {
+                      "exerciseSessionId": 13,
+                      "exerciseTemplateId": 3,
+                      "exerciseDefinitionId": 30,
+                      "name": "Press",
+                      "guidance": "Control the eccentric",
+                      "repMin": 6,
+                      "repMax": 8,
+                      "loadKind": "WEIGHT",
+                      "loadMin": 40.0,
+                      "loadMax": 60.0,
+                      "loadUnit": "LB",
+                      "restTimeSeconds": 90,
+                      "sortOrder": 0,
+                      "sets": [
+                        {
+                          "id": 14,
+                          "exerciseSessionId": 13,
+                          "setIndex": 0,
+                          "repsActual": 7,
+                          "loadActual": 50.0,
+                          "notes": "Felt good",
+                          "skipped": false
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+    """.trimIndent()
 }

@@ -85,7 +85,8 @@ Important entry points:
 - Every exercise must have at least one set.
 - All exercises in the same circuit must use the same set count.
 - Imported workout templates use the same validation rules as editor-created templates.
-- Imports append new templates and do not overwrite, merge, or skip duplicate names.
+- Template imports append new templates and do not overwrite, merge, or skip duplicate names.
+- Full backup imports replace current workout data with the imported backup.
 - Imported exercises reuse exercise library definitions by normalized name and create missing definitions.
 - Session execution is round-based and interleaved inside each circuit.
 - Completed sessions are stored as snapshots so history is preserved even if templates change later.
@@ -93,15 +94,19 @@ Important entry points:
 
 ## Import Notes
 
-Workout template import is implemented as a domain-level importer plus a workout-list UI flow:
+Workout import is implemented as a domain-level importer plus a workout-list UI flow:
 
 - `ImportWorkoutsUseCase` coordinates fetching/parsing, validation, and saving.
 - `WorkoutImportParser` accepts JSON or YAML, either as `{"workouts":[...]}` / `workouts: [...]` or one single workout object.
+- Full JSON backups are detected by top-level `schemaVersion`; supported full backups use export `schemaVersion` `2`.
+- `RoomWorkoutDataImportRepository` restores full backups in one replace-all Room transaction with preserved ids.
 - URL imports use `HttpURLConnection` and require `android.permission.INTERNET`.
 - Local file imports use `ActivityResultContracts.OpenDocument` and read the selected `Uri` once through `ContentResolver`.
 - Import DTOs are intentionally separate from Room entities and domain models.
 
 The import schema maps to workout drafts, then save-time resolution creates or reuses exercise definitions. JSON and YAML use the same field names. Required structural fields are workout `circuits` and circuit `exercises`; exercise fields otherwise fall back to the same defaults as `ExerciseDraft` where possible. Exercise name matching trims, collapses whitespace, and compares case-insensitively.
+
+Full backup import is JSON-only and is the inverse of full export. It clears workout/session/exercise data, then restores exercise definitions, templates, sessions, snapshot rows, and set entries from the backup.
 
 ## Export Notes
 
@@ -121,7 +126,8 @@ Full data export is implemented as a separate domain-level exporter plus a worko
 - Prefill for active sessions comes from the previous set in the current session, then the latest completed session for the same `exerciseDefinitionId` and `setIndex`.
 - Exercise history shown during workouts aggregates completed sets by `exerciseDefinitionId`, including matching exercises from other workouts.
 - Only one active session is expected at a time in this MVP.
-- Imports save each valid workout through `WorkoutRepository.saveWorkout` with a new template id.
+- Template imports save each valid workout through `WorkoutRepository.saveWorkout` with a new template id.
+- Full backup imports preserve exported ids so template/session relationships round-trip.
 
 ## Testing
 
@@ -131,7 +137,7 @@ Current test coverage includes:
 - workout import parser and import use case unit tests
 - workout list import state unit tests
 - session progression unit tests
-- Room relationship and snapshot instrumentation tests
+- Room relationship, snapshot, and full backup restore instrumentation tests
 - a basic Compose UI instrumentation test for the workout list empty state
 
 Add tests alongside new behavior when possible:
@@ -149,4 +155,4 @@ Add tests alongside new behavior when possible:
 
 - improve form UX for editing circuits and exercises
 - add richer session and history tests
-- add import support for full-data restores once the export schema is ready for round-tripping
+- add conflict-aware preview/confirmation UI for full backup restores

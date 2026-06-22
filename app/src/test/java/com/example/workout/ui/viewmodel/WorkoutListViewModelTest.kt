@@ -5,6 +5,9 @@ import dev.wwade.workout.domain.exporter.WorkoutDataExportSnapshot
 import dev.wwade.workout.domain.importer.ImportWorkoutsUseCase
 import dev.wwade.workout.domain.importer.WorkoutImportException
 import dev.wwade.workout.domain.importer.WorkoutImportJsonFetcher
+import dev.wwade.workout.domain.importer.WorkoutDataRestoreCounts
+import dev.wwade.workout.domain.importer.WorkoutDataRestoreSnapshot
+import dev.wwade.workout.domain.importer.validWorkoutDataBackupJson
 import dev.wwade.workout.domain.importer.validSingleWorkoutJson
 import dev.wwade.workout.domain.importer.validSingleWorkoutYaml
 import dev.wwade.workout.domain.model.CircuitSessionDetail
@@ -23,6 +26,7 @@ import dev.wwade.workout.domain.model.WorkoutListItem
 import dev.wwade.workout.domain.model.WorkoutSessionDetail
 import dev.wwade.workout.domain.model.WorkoutTemplate
 import dev.wwade.workout.domain.repository.SessionRepository
+import dev.wwade.workout.domain.repository.WorkoutDataImportRepository
 import dev.wwade.workout.domain.repository.WorkoutDataExportRepository
 import dev.wwade.workout.domain.repository.WorkoutRepository
 import dev.wwade.workout.ui.state.WorkoutImportDialog
@@ -105,6 +109,27 @@ class WorkoutListViewModelTest {
 
         assertThat(repository.savedWorkouts.map { it.name }).containsExactly("Yaml Imported")
         assertThat(viewModel.state.value.message?.text).contains("Imported 1 workout")
+        assertThat(viewModel.state.value.message?.isError).isFalse()
+        collector.cancel()
+    }
+
+    @Test
+    fun fullBackupImportShowsRestoreMessage() = runTest {
+        val importRepository = FakeWorkoutDataImportRepository()
+        val viewModel = viewModel(
+            repository = FakeWorkoutRepository(),
+            importRepository = importRepository,
+        )
+        val collector = backgroundScope.launch {
+            viewModel.state.collectLatest { }
+        }
+
+        viewModel.importFromJson(validWorkoutDataBackupJson())
+        advanceUntilIdle()
+
+        assertThat(importRepository.restoredSnapshot?.workouts?.single()?.name).isEqualTo("Push Day")
+        assertThat(viewModel.state.value.message?.text)
+            .isEqualTo("Restored 1 exercise, 1 workout, and 1 session.")
         assertThat(viewModel.state.value.message?.isError).isFalse()
         collector.cancel()
     }
@@ -224,6 +249,7 @@ class WorkoutListViewModelTest {
         fetcher: WorkoutImportJsonFetcher = object : WorkoutImportJsonFetcher {
             override suspend fun fetch(url: String): String = validSingleWorkoutJson("Remote")
         },
+        importRepository: WorkoutDataImportRepository = FakeWorkoutDataImportRepository(),
         exportRepository: WorkoutDataExportRepository = FakeWorkoutDataExportRepository(),
     ): WorkoutListViewModel {
         return WorkoutListViewModel(
@@ -231,12 +257,27 @@ class WorkoutListViewModelTest {
             sessionRepository = FakeWorkoutListSessionRepository(),
             importWorkoutsUseCase = ImportWorkoutsUseCase(
                 workoutRepository = repository,
+                importRepository = importRepository,
                 jsonFetcher = fetcher,
             ),
             exportWorkoutDataUseCase = ExportWorkoutDataUseCase(
                 exportRepository = exportRepository,
                 clock = Clock.fixed(Instant.parse("2026-06-21T07:00:00Z"), ZoneOffset.UTC),
             ),
+        )
+    }
+}
+
+private class FakeWorkoutDataImportRepository : WorkoutDataImportRepository {
+    var restoredSnapshot: WorkoutDataRestoreSnapshot? = null
+        private set
+
+    override suspend fun restoreSnapshot(snapshot: WorkoutDataRestoreSnapshot): WorkoutDataRestoreCounts {
+        restoredSnapshot = snapshot
+        return WorkoutDataRestoreCounts(
+            exerciseDefinitionCount = snapshot.exerciseDefinitions.size,
+            workoutCount = snapshot.workouts.size,
+            sessionCount = snapshot.sessions.size,
         )
     }
 }

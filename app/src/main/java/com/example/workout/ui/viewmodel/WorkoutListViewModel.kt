@@ -220,6 +220,15 @@ class WorkoutListViewModel(
     }
 
     private fun WorkoutImportResult.toMessage(): WorkoutListMessage {
+        restoredCounts?.let { counts ->
+            return WorkoutListMessage(
+                text = "Restored ${counts.exerciseDefinitionCount} exercise${counts.exerciseDefinitionCount.pluralSuffix()}, " +
+                    "${counts.workoutCount} workout${counts.workoutCount.pluralSuffix()}, and " +
+                    "${counts.sessionCount} session${counts.sessionCount.pluralSuffix()}.",
+                isError = false,
+            )
+        }
+
         val summary = when {
             importedCount == 0 -> "No workouts were imported."
             isSuccess -> "Imported $importedCount workout${importedCount.pluralSuffix()}."

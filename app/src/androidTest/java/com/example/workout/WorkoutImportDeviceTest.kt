@@ -110,7 +110,7 @@ class WorkoutImportDeviceTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("Import workouts").performClick()
+        composeRule.onNodeWithContentDescription("Import data").performClick()
         composeRule.onNodeWithText("URL").performClick()
         composeRule.onNode(hasSetTextAction()).performTextInput("https://example.com/import.yaml")
         composeRule.onNodeWithText("Import").performClick()

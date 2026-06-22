@@ -1,11 +1,13 @@
 package dev.wwade.workout.domain.importer
 
 import dev.wwade.workout.domain.model.WorkoutDraft
+import dev.wwade.workout.domain.repository.WorkoutDataImportRepository
 import dev.wwade.workout.domain.repository.WorkoutRepository
 import dev.wwade.workout.domain.usecase.ValidateWorkoutDraftUseCase
 
 class ImportWorkoutsUseCase(
     private val workoutRepository: WorkoutRepository,
+    private val importRepository: WorkoutDataImportRepository? = null,
     private val parser: WorkoutImportParser = WorkoutImportParser(),
     private val jsonFetcher: WorkoutImportJsonFetcher = JavaNetWorkoutImportJsonFetcher(),
     private val validator: ValidateWorkoutDraftUseCase = ValidateWorkoutDraftUseCase(),
@@ -15,8 +17,22 @@ class ImportWorkoutsUseCase(
             is WorkoutImportSource.RawJson -> source.json
             is WorkoutImportSource.Url -> jsonFetcher.fetch(source.url.trim())
         }
-        val workouts = parser.parse(rawJson)
+        return when (val parsedImport = parser.parseImport(rawJson)) {
+            is ParsedWorkoutImport.TemplateWorkouts -> importWorkoutTemplates(parsedImport.workouts)
+            is ParsedWorkoutImport.FullBackup -> {
+                val counts = importRepository?.restoreSnapshot(parsedImport.snapshot)
+                    ?: throw WorkoutImportException("Full backup import is not available.")
+                WorkoutImportResult(
+                    importedCount = 0,
+                    failedCount = 0,
+                    workoutErrors = emptyList(),
+                    restoredCounts = counts,
+                )
+            }
+        }
+    }
 
+    private suspend fun importWorkoutTemplates(workouts: List<WorkoutDraft>): WorkoutImportResult {
         var importedCount = 0
         val errors = mutableListOf<String>()
         workouts.forEachIndexed { index, workout ->
@@ -74,4 +90,3 @@ class ImportWorkoutsUseCase(
         return "Workout failed validation."
     }
 }
-
