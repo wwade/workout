@@ -24,6 +24,7 @@ class WorkoutListScreenTest {
                 onStartWorkout = {},
                 onResumeWorkout = {},
                 onOpenHistory = {},
+                onOpenExerciseLibrary = {},
                 onPrepareExport = { null },
                 onExportSaved = {},
                 onExportFailed = {},

@@ -15,10 +15,10 @@ interface SessionRepository {
     fun observeSessionDetail(sessionId: Long): Flow<WorkoutSessionDetail?>
     suspend fun getSessionDetail(sessionId: Long): WorkoutSessionDetail?
     fun observeCompletedSessions(): Flow<List<CompletedSessionListItem>>
-    suspend fun getLatestCompletedSetEntry(exerciseTemplateId: Long, setIndex: Int): SetEntry?
-    suspend fun getPreviousWorkoutSetEntries(exerciseTemplateId: Long): List<ExerciseSetHistoryItem>
+    suspend fun getLatestCompletedSetEntry(exerciseDefinitionId: Long, setIndex: Int): SetEntry?
+    suspend fun getPreviousWorkoutSetEntries(exerciseDefinitionId: Long): List<ExerciseSetHistoryItem>
     suspend fun getRecentCompletedSetEntries(
-        exerciseTemplateId: Long,
+        exerciseDefinitionId: Long,
         limit: Int,
     ): List<ExerciseSetHistoryItem>
 }

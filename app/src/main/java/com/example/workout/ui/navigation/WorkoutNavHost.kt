@@ -13,12 +13,14 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import dev.wwade.workout.AppContainer
 import dev.wwade.workout.ui.screen.ActiveSessionScreen
+import dev.wwade.workout.ui.screen.ExerciseLibraryScreen
 import dev.wwade.workout.ui.screen.HistoryScreen
 import dev.wwade.workout.ui.screen.SessionSummaryScreen
 import dev.wwade.workout.ui.screen.WorkoutEditorScreen
 import dev.wwade.workout.ui.screen.WorkoutListScreen
 import dev.wwade.workout.ui.viewmodel.ActiveSessionViewModel
 import dev.wwade.workout.ui.viewmodel.AppViewModelFactory
+import dev.wwade.workout.ui.viewmodel.ExerciseLibraryViewModel
 import dev.wwade.workout.ui.viewmodel.HistoryViewModel
 import dev.wwade.workout.ui.viewmodel.SessionSummaryViewModel
 import dev.wwade.workout.ui.viewmodel.WorkoutEditorViewModel
@@ -60,6 +62,7 @@ fun WorkoutNavHost(
                 },
                 onResumeWorkout = { sessionId -> navController.navigate("session/$sessionId") },
                 onOpenHistory = { navController.navigate("history") },
+                onOpenExerciseLibrary = { navController.navigate("exercises") },
                 onPrepareExport = viewModel::prepareExport,
                 onExportSaved = viewModel::onExportSaved,
                 onExportFailed = viewModel::onExportFailed,
@@ -90,6 +93,7 @@ fun WorkoutNavHost(
                 factory = AppViewModelFactory.create {
                     WorkoutEditorViewModel(
                         workoutRepository = container.workoutRepository,
+                        exerciseDefinitionRepository = container.exerciseDefinitionRepository,
                         workoutId = workoutId,
                     )
                 },
@@ -173,6 +177,25 @@ fun WorkoutNavHost(
                 state = state,
                 onBack = { navController.popBackStack() },
                 onOpenSession = { sessionId -> navController.navigate("summary/$sessionId") },
+            )
+        }
+
+        composable("exercises") {
+            val viewModel: ExerciseLibraryViewModel = viewModel(
+                factory = AppViewModelFactory.create {
+                    ExerciseLibraryViewModel(
+                        exerciseDefinitionRepository = container.exerciseDefinitionRepository,
+                    )
+                },
+            )
+            val state by viewModel.state.collectAsState()
+            ExerciseLibraryScreen(
+                state = state,
+                onBack = { navController.popBackStack() },
+                onUpdateSearch = viewModel::updateSearchQuery,
+                onSaveExercise = viewModel::saveExercise,
+                onArchiveExercise = viewModel::archiveExercise,
+                onDismissError = viewModel::clearError,
             )
         }
 

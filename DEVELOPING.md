@@ -86,8 +86,10 @@ Important entry points:
 - All exercises in the same circuit must use the same set count.
 - Imported workout templates use the same validation rules as editor-created templates.
 - Imports append new templates and do not overwrite, merge, or skip duplicate names.
+- Imported exercises reuse exercise library definitions by normalized name and create missing definitions.
 - Session execution is round-based and interleaved inside each circuit.
 - Completed sessions are stored as snapshots so history is preserved even if templates change later.
+- Active-session prefill and exercise history use shared exercise definition ids across workouts.
 
 ## Import Notes
 
@@ -99,7 +101,7 @@ Workout template import is implemented as a domain-level importer plus a workout
 - Local file imports use `ActivityResultContracts.OpenDocument` and read the selected `Uri` once through `ContentResolver`.
 - Import DTOs are intentionally separate from Room entities and domain models.
 
-The v1 import schema maps directly to `WorkoutDraft`, `CircuitDraft`, and `ExerciseDraft`. JSON and YAML use the same field names. Required structural fields are workout `circuits` and circuit `exercises`; exercise fields otherwise fall back to the same defaults as `ExerciseDraft` where possible.
+The import schema maps to workout drafts, then save-time resolution creates or reuses exercise definitions. JSON and YAML use the same field names. Required structural fields are workout `circuits` and circuit `exercises`; exercise fields otherwise fall back to the same defaults as `ExerciseDraft` where possible. Exercise name matching trims, collapses whitespace, and compares case-insensitively.
 
 ## Export Notes
 
@@ -108,13 +110,16 @@ Full data export is implemented as a separate domain-level exporter plus a worko
 - `ExportWorkoutDataUseCase` gathers templates and session history and serializes JSON.
 - Export DTOs live under `domain/exporter` and stay separate from Room entities and domain models.
 - Local export uses `ActivityResultContracts.CreateDocument` and writes the selected `Uri` once through `ContentResolver`.
-- The current export schema is JSON-only and includes templates, sessions, snapshot rows, and set entries.
+- The current export schema is JSON-only and includes exercise definitions, templates, sessions, snapshot rows, and set entries.
+- Export `schemaVersion` is `2`; exercise template and session exercise rows include `exerciseDefinitionId`.
 
 ## Persistence Notes
 
 - Template definitions and performed sessions are stored in Room.
+- Shared exercises live in `exercise_definitions`; workout exercises reference them from `exercise_templates`.
 - Session start creates snapshot rows in the session tables.
-- Prefill for active sessions comes from the latest completed session for the same `exerciseTemplateId` and `setIndex`.
+- Prefill for active sessions comes from the previous set in the current session, then the latest completed session for the same `exerciseDefinitionId` and `setIndex`.
+- Exercise history shown during workouts aggregates completed sets by `exerciseDefinitionId`, including matching exercises from other workouts.
 - Only one active session is expected at a time in this MVP.
 - Imports save each valid workout through `WorkoutRepository.saveWorkout` with a new template id.
 

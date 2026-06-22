@@ -155,10 +155,16 @@ abstract class WorkoutTemplateDao {
         exercise: ExerciseDraft,
         sortOrder: Int,
     ): Long {
+        val definition = exercise.exerciseDefinitionId?.let { id ->
+            getExerciseDefinitionById(id) ?: error("Missing exercise definition $id")
+        } ?: getOrCreateExerciseDefinition(
+            name = exercise.name,
+            defaultGuidance = exercise.defaultGuidance.ifBlank { exercise.guidance },
+        )
         val entity = ExerciseTemplateEntity(
             id = exercise.id ?: 0,
             circuitId = circuitId,
-            name = exercise.name.trim(),
+            exerciseDefinitionId = definition.id,
             guidance = exercise.guidance.trim(),
             repMin = exercise.repMin,
             repMax = exercise.repMax,
@@ -176,5 +182,35 @@ abstract class WorkoutTemplateDao {
             updateExercise(entity)
             exercise.id
         }
+    }
+
+    @Query("SELECT * FROM exercise_definitions WHERE id = :id")
+    protected abstract suspend fun getExerciseDefinitionById(id: Long): ExerciseDefinitionEntity?
+
+    @Query("SELECT * FROM exercise_definitions WHERE normalizedName = :normalizedName LIMIT 1")
+    protected abstract suspend fun getExerciseDefinitionByNormalizedName(normalizedName: String): ExerciseDefinitionEntity?
+
+    @Insert
+    protected abstract suspend fun insertExerciseDefinition(entity: ExerciseDefinitionEntity): Long
+
+    @Transaction
+    protected open suspend fun getOrCreateExerciseDefinition(
+        name: String,
+        defaultGuidance: String,
+    ): ExerciseDefinitionEntity {
+        val normalizedName = dev.wwade.workout.domain.repository.normalizeExerciseName(name)
+        getExerciseDefinitionByNormalizedName(normalizedName)?.let { return it }
+        val now = System.currentTimeMillis()
+        val id = insertExerciseDefinition(
+            ExerciseDefinitionEntity(
+                name = name.trim(),
+                normalizedName = normalizedName,
+                defaultGuidance = defaultGuidance.trim(),
+                archived = false,
+                createdAt = now,
+                updatedAt = now,
+            ),
+        )
+        return getExerciseDefinitionById(id) ?: error("Missing exercise definition $id")
     }
 }

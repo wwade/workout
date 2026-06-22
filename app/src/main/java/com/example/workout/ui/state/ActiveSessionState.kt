@@ -33,6 +33,7 @@ data class SessionPositionOptionState(
 data class ActiveExerciseCardState(
     val exerciseSessionId: Long,
     val exerciseTemplateId: Long?,
+    val exerciseDefinitionId: Long?,
     val exerciseName: String,
     val guidance: String,
     val repRangeLabel: String,

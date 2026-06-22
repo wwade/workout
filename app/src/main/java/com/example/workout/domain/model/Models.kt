@@ -17,6 +17,24 @@ enum class SessionStatus {
     ABANDONED,
 }
 
+data class ExerciseDefinition(
+    val id: Long,
+    val name: String,
+    val normalizedName: String,
+    val defaultGuidance: String,
+    val archived: Boolean,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val usageCount: Int = 0,
+)
+
+data class ExerciseDefinitionDraft(
+    val id: Long? = null,
+    val name: String = "",
+    val defaultGuidance: String = "",
+    val archived: Boolean = false,
+)
+
 data class WorkoutTemplate(
     val id: Long,
     val name: String,
@@ -37,8 +55,10 @@ data class CircuitTemplate(
 data class ExerciseTemplate(
     val id: Long,
     val circuitId: Long,
+    val exerciseDefinitionId: Long,
     val name: String,
     val guidance: String,
+    val guidanceOverride: String,
     val repMin: Int,
     val repMax: Int,
     val loadKind: LoadKind,
@@ -64,7 +84,9 @@ data class CircuitDraft(
 
 data class ExerciseDraft(
     val id: Long? = null,
+    val exerciseDefinitionId: Long? = null,
     val name: String = "",
+    val defaultGuidance: String = "",
     val guidance: String = "",
     val repMin: Int = 6,
     val repMax: Int = 8,
@@ -106,6 +128,7 @@ data class CircuitSessionDetail(
 data class ExerciseSessionDetail(
     val exerciseSessionId: Long,
     val exerciseTemplateId: Long?,
+    val exerciseDefinitionId: Long?,
     val name: String,
     val guidance: String,
     val repMin: Int,
@@ -183,6 +206,7 @@ data class SessionPositionSnapshot(
 data class ExerciseProgressSnapshot(
     val exerciseSessionId: Long,
     val exerciseTemplateId: Long?,
+    val exerciseDefinitionId: Long?,
     val exerciseName: String,
     val guidance: String,
     val repRangeLabel: String,

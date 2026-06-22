@@ -17,8 +17,8 @@ class GetSessionProgressUseCase(
             detail?.let {
                 SessionProgressCalculator.buildSnapshot(
                     detail = it,
-                    prefillProvider = { exerciseTemplateId, setIndex ->
-                        exerciseTemplateId?.let { id ->
+                    prefillProvider = { exerciseDefinitionId, setIndex ->
+                        exerciseDefinitionId?.let { id ->
                             sessionRepository.getLatestCompletedSetEntry(id, setIndex)
                         }
                     },
@@ -106,13 +106,14 @@ object SessionProgressCalculator {
         val activeSetIndex = position?.setIndex ?: 0
         val exercises = activeCircuit.exercises.sortedBy { it.sortOrder }.map { exercise ->
             val currentSet = exercise.sets.firstOrNull { it.setIndex == activeSetIndex }
-            val prefill = prefillProvider(exercise.exerciseTemplateId, activeSetIndex)
+            val prefill = prefillProvider(exercise.exerciseDefinitionId, activeSetIndex)
             val previousSet = exercise.sets
                 .filter { it.setIndex < activeSetIndex }
                 .maxByOrNull { it.setIndex }
             ExerciseProgressSnapshot(
                 exerciseSessionId = exercise.exerciseSessionId,
                 exerciseTemplateId = exercise.exerciseTemplateId,
+                exerciseDefinitionId = exercise.exerciseDefinitionId,
                 exerciseName = exercise.name,
                 guidance = exercise.guidance,
                 repRangeLabel = "${exercise.repMin}-${exercise.repMax}",
@@ -121,7 +122,7 @@ object SessionProgressCalculator {
                 restTimeSeconds = exercise.restTimeSeconds,
                 suggestedReps = currentSet?.repsActual ?: previousSet?.repsActual ?: prefill?.repsActual,
                 suggestedLoad = currentSet?.loadActual ?: previousSet?.loadActual ?: prefill?.loadActual,
-                suggestedNotes = currentSet?.notes ?: prefill?.notes.orEmpty(),
+                suggestedNotes = currentSet?.notes ?: previousSet?.notes ?: prefill?.notes.orEmpty(),
                 suggestedSkipped = currentSet?.skipped ?: false,
             )
         }

@@ -38,6 +38,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
 import dev.wwade.workout.domain.model.CircuitDraft
+import dev.wwade.workout.domain.model.ExerciseDefinition
 import dev.wwade.workout.domain.model.ExerciseDraft
 import dev.wwade.workout.domain.model.LoadKind
 import dev.wwade.workout.domain.model.LoadUnit
@@ -216,6 +217,7 @@ fun WorkoutEditorScreen(
         ExerciseDialog(
             title = if (exerciseIndex == null) "Add Exercise" else "Edit Exercise",
             initialValue = initialExercise,
+            exerciseDefinitions = state.exerciseDefinitions,
             onDismiss = { editingExercise = null },
             onSave = {
                 onUpsertExercise(circuitIndex, exerciseIndex, it)
@@ -317,10 +319,13 @@ private fun CircuitDialog(
 private fun ExerciseDialog(
     title: String,
     initialValue: ExerciseDraft,
+    exerciseDefinitions: List<ExerciseDefinition>,
     onDismiss: () -> Unit,
     onSave: (ExerciseDraft) -> Unit,
 ) {
+    var selectedDefinitionId by remember(initialValue) { mutableStateOf(initialValue.exerciseDefinitionId) }
     var name by remember(initialValue) { mutableStateOf(initialValue.name) }
+    var search by remember(initialValue) { mutableStateOf(initialValue.name) }
     var guidance by remember(initialValue) { mutableStateOf(initialValue.guidance) }
     var repMin by remember(initialValue) { mutableStateOf(initialValue.repMin.toString()) }
     var repMax by remember(initialValue) { mutableStateOf(initialValue.repMax.toString()) }
@@ -330,13 +335,53 @@ private fun ExerciseDialog(
     var setCount by remember(initialValue) { mutableStateOf(initialValue.setCount.toString()) }
     var loadKind by remember(initialValue) { mutableStateOf(initialValue.loadKind) }
     var loadUnit by remember(initialValue) { mutableStateOf(initialValue.loadUnit) }
+    val selectedDefinition = exerciseDefinitions.firstOrNull { it.id == selectedDefinitionId }
+    val pickerOptions = exerciseDefinitions
+        .filter { !it.archived || it.id == selectedDefinitionId }
+        .filter { definition ->
+            val query = search.trim()
+            query.isBlank() || definition.name.contains(query, ignoreCase = true)
+        }
+        .take(6)
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") })
+                selectedDefinition?.let {
+                    Text("Selected: ${it.name}", style = MaterialTheme.typography.titleSmall)
+                }
+                OutlinedTextField(
+                    value = search,
+                    onValueChange = {
+                        search = it
+                        selectedDefinitionId = null
+                        name = it
+                    },
+                    label = { Text("Find or add exercise") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                pickerOptions.forEach { definition ->
+                    TextButton(
+                        onClick = {
+                            selectedDefinitionId = definition.id
+                            name = definition.name
+                            search = definition.name
+                            if (guidance.isBlank()) {
+                                guidance = definition.defaultGuidance
+                            }
+                        },
+                    ) {
+                        Text(
+                            buildString {
+                                append(definition.name)
+                                if (definition.archived) append(" (archived)")
+                            },
+                        )
+                    }
+                }
                 OutlinedTextField(value = guidance, onValueChange = { guidance = it }, label = { Text("Guidance") })
                 OutlinedTextField(
                     value = repMin,
@@ -396,7 +441,9 @@ private fun ExerciseDialog(
                 onClick = {
                     onSave(
                         initialValue.copy(
+                            exerciseDefinitionId = selectedDefinitionId,
                             name = name,
+                            defaultGuidance = selectedDefinition?.defaultGuidance ?: guidance,
                             guidance = guidance,
                             repMin = repMin.toIntOrNull() ?: 0,
                             repMax = repMax.toIntOrNull() ?: 0,

@@ -11,14 +11,16 @@ The app is built around two modes:
 
 - Create, edit, and delete workout templates
 - Organize workouts into circuits and exercises
-- Define exercise guidance, rep ranges, load ranges, units, and set counts
+- Manage an exercise library shared across workout templates
+- Select shared exercises inside workouts, with workout-specific guidance and prescription values
 - Validate that all exercises inside a circuit use the same set count
 - Start a workout session from a saved template
 - Perform circuits in strict interleaved rounds
 - Save reps, load, notes, and skipped status for each set
 - Resume an in-progress workout
 - Save completed workout history
-- Prefill set inputs from the latest completed session for the same exercise and set index
+- Prefill set inputs and notes from previous sets and completed sessions for the same shared exercise
+- Review recent set history for an exercise while working out, including uses in other workouts
 - Import workout templates from a local JSON or YAML file, or a direct JSON/YAML URL
 - Export all templates and session history to a local JSON backup file
 
@@ -30,6 +32,8 @@ Use the Import action on the workout list screen to import workout templates fro
 - a direct-download URL that returns JSON or YAML
 
 Imports are template-only. They do not import session history or active workouts, and they never overwrite existing templates. If an imported workout has the same name as an existing workout, the app creates another copy with the imported name.
+
+Imported exercises are matched to the exercise library by normalized name: leading/trailing whitespace is ignored, repeated whitespace is collapsed, and matching is case-insensitive. Matching exercises reuse the existing library entry, including archived entries. New exercise names create library entries, and imported guidance is saved on the workout exercise while also seeding default guidance for newly created library entries.
 
 The supported payload shape is:
 
@@ -90,21 +94,29 @@ Use the Export action on the workout list screen to save a JSON backup through A
 
 Exports include:
 
+- exercise library definitions
 - all workout templates
 - active, abandoned, and completed workout sessions
 - session snapshots and set entries
 
-The current export schema is JSON-only and uses a top-level `schemaVersion` field so the format can evolve over time.
+The current export schema is JSON-only, uses top-level `schemaVersion: 2`, and includes canonical exercise ids so shared exercise history can be reconstructed.
 
 ## Data Model
 
 - A workout has one or more circuits
-- A circuit has one or more exercises
-- An exercise has one or more sets
+- A circuit has one or more workout exercise prescriptions
+- A workout exercise points at one shared exercise definition
+- A workout exercise has one or more sets
 
-Exercise templates include:
+Exercise definitions include:
 
-- guidance text
+- name
+- default guidance text
+- archive status
+
+Workout exercise prescriptions include:
+
+- workout-specific guidance override
 - rep range
 - load range
 - load kind: `WEIGHT` or `DURATION`

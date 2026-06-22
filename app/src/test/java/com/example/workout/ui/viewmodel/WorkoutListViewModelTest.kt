@@ -10,6 +10,7 @@ import dev.wwade.workout.domain.importer.validSingleWorkoutYaml
 import dev.wwade.workout.domain.model.CircuitSessionDetail
 import dev.wwade.workout.domain.model.CircuitTemplate
 import dev.wwade.workout.domain.model.CompletedSessionListItem
+import dev.wwade.workout.domain.model.ExerciseDefinition
 import dev.wwade.workout.domain.model.ExerciseSessionDetail
 import dev.wwade.workout.domain.model.ExerciseSetHistoryItem
 import dev.wwade.workout.domain.model.ExerciseTemplate
@@ -173,7 +174,7 @@ class WorkoutListViewModelTest {
 
         assertThat(export).isNotNull()
         assertThat(export?.fileName).isEqualTo("workout-tracker-export-2026-06-21.json")
-        assertThat(export?.content).contains("\"schemaVersion\": 1")
+        assertThat(export?.content).contains("\"schemaVersion\": 2")
         assertThat(export?.content).contains("\"workoutName\": \"Leg Day\"")
         collector.cancel()
     }
@@ -279,16 +280,16 @@ private class FakeWorkoutListSessionRepository : SessionRepository {
     override fun observeCompletedSessions(): Flow<List<CompletedSessionListItem>> = flowOf(emptyList())
 
     override suspend fun getLatestCompletedSetEntry(
-        exerciseTemplateId: Long,
+        exerciseDefinitionId: Long,
         setIndex: Int,
     ): dev.wwade.workout.domain.model.SetEntry? = null
 
     override suspend fun getPreviousWorkoutSetEntries(
-        exerciseTemplateId: Long,
+        exerciseDefinitionId: Long,
     ): List<ExerciseSetHistoryItem> = emptyList()
 
     override suspend fun getRecentCompletedSetEntries(
-        exerciseTemplateId: Long,
+        exerciseDefinitionId: Long,
         limit: Int,
     ): List<ExerciseSetHistoryItem> = emptyList()
 }
@@ -296,6 +297,17 @@ private class FakeWorkoutListSessionRepository : SessionRepository {
 private class FakeWorkoutDataExportRepository : WorkoutDataExportRepository {
     override suspend fun exportSnapshot(): WorkoutDataExportSnapshot {
         return WorkoutDataExportSnapshot(
+            exerciseDefinitions = listOf(
+                ExerciseDefinition(
+                    id = 30,
+                    name = "Squat",
+                    normalizedName = "squat",
+                    defaultGuidance = "Stay braced",
+                    archived = false,
+                    createdAt = 10,
+                    updatedAt = 20,
+                ),
+            ),
             workouts = listOf(
                 WorkoutTemplate(
                     id = 1,
@@ -313,8 +325,10 @@ private class FakeWorkoutDataExportRepository : WorkoutDataExportRepository {
                                 ExerciseTemplate(
                                     id = 3,
                                     circuitId = 2,
+                                    exerciseDefinitionId = 30,
                                     name = "Squat",
                                     guidance = "Stay braced",
+                                    guidanceOverride = "Stay braced",
                                     repMin = 5,
                                     repMax = 8,
                                     loadKind = LoadKind.WEIGHT,
@@ -349,6 +363,7 @@ private class FakeWorkoutDataExportRepository : WorkoutDataExportRepository {
                                 ExerciseSessionDetail(
                                     exerciseSessionId = 13,
                                     exerciseTemplateId = 3,
+                                    exerciseDefinitionId = 30,
                                     name = "Squat",
                                     guidance = "Stay braced",
                                     repMin = 5,

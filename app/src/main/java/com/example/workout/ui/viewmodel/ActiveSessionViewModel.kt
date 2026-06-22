@@ -47,8 +47,8 @@ class ActiveSessionViewModel(
             val progress = SessionProgressCalculator.buildSnapshot(
                 detail = detail,
                 selectedPosition = selectedOrFallback,
-                prefillProvider = { exerciseTemplateId, setIndex ->
-                    exerciseTemplateId?.let { id ->
+                prefillProvider = { exerciseDefinitionId, setIndex ->
+                    exerciseDefinitionId?.let { id ->
                         sessionRepository.getLatestCompletedSetEntry(id, setIndex)
                     }
                 },
@@ -60,19 +60,20 @@ class ActiveSessionViewModel(
             val roundOverrides = inputOverrides[activeRoundKey].orEmpty()
             val exerciseCards = progress.exercises.map { card ->
                 val override = roundOverrides[card.exerciseSessionId]
-                val previousWorkoutHistory = card.exerciseTemplateId?.let { exerciseTemplateId ->
-                    sessionRepository.getPreviousWorkoutSetEntries(exerciseTemplateId)
+                val previousWorkoutHistory = card.exerciseDefinitionId?.let { exerciseDefinitionId ->
+                    sessionRepository.getPreviousWorkoutSetEntries(exerciseDefinitionId)
                         .map { it.toHistoryRow(card.loadUnit) }
                 }.orEmpty()
-                val fullHistory = card.exerciseTemplateId?.let { exerciseTemplateId ->
+                val fullHistory = card.exerciseDefinitionId?.let { exerciseDefinitionId ->
                     sessionRepository.getRecentCompletedSetEntries(
-                        exerciseTemplateId = exerciseTemplateId,
+                        exerciseDefinitionId = exerciseDefinitionId,
                         limit = MaxHistoryRows,
                     ).map { it.toHistoryRow(card.loadUnit) }
                 }.orEmpty()
                 ActiveExerciseCardState(
                     exerciseSessionId = card.exerciseSessionId,
                     exerciseTemplateId = card.exerciseTemplateId,
+                    exerciseDefinitionId = card.exerciseDefinitionId,
                     exerciseName = card.exerciseName,
                     guidance = card.guidance,
                     repRangeLabel = card.repRangeLabel,

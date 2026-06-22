@@ -106,6 +106,23 @@ class SessionProgressCalculatorTest {
     }
 
     @Test
+    fun prefersPreviousSetNotesForNextRound() = runTest {
+        val detail = sessionDetail(
+            setCount = 3,
+            firstExerciseSets = listOf(setEntry(0, 0, notes = "Felt smooth")),
+            secondExerciseSets = listOf(setEntry(1, 0, notes = "Go heavier")),
+        )
+
+        val snapshot = SessionProgressCalculator.buildSnapshot(
+            detail = detail,
+            prefillProvider = { _, _ -> setEntry(999, 1, notes = "Old history") },
+        )
+
+        assertThat(snapshot.exercises[0].suggestedNotes).isEqualTo("Felt smooth")
+        assertThat(snapshot.exercises[1].suggestedNotes).isEqualTo("Go heavier")
+    }
+
+    @Test
     fun doesNotCarrySkippedStateFromHistory() = runTest {
         val detail = sessionDetail(
             setCount = 3,
@@ -167,6 +184,7 @@ class SessionProgressCalculatorTest {
                 ExerciseSessionDetail(
                     exerciseSessionId = index.toLong() + 1,
                     exerciseTemplateId = index.toLong() + 100,
+                    exerciseDefinitionId = index.toLong() + 200,
                     name = "Exercise ${index + 1}",
                     guidance = "",
                     repMin = 6,
@@ -188,6 +206,7 @@ class SessionProgressCalculatorTest {
         setIndex: Int,
         repsActual: Int = 8,
         loadActual: Double = 30.0,
+        notes: String = "",
         skipped: Boolean = false,
     ): SetEntry {
         return SetEntry(
@@ -196,7 +215,7 @@ class SessionProgressCalculatorTest {
             setIndex = setIndex,
             repsActual = repsActual,
             loadActual = loadActual,
-            notes = "",
+            notes = notes,
             skipped = skipped,
         )
     }

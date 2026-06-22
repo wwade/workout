@@ -118,14 +118,28 @@ class SessionPrefillWorkflowTest {
         val completedFirstSession = sessionRepository.getSessionDetail(firstSessionId)!!
         assertThat(SessionProgressCalculator.isCompleted(completedFirstSession)).isTrue()
         val previousWorkoutSets = sessionRepository.getPreviousWorkoutSetEntries(
-            exerciseTemplateId = firstCircuitExercises[0].exerciseTemplateId!!,
+            exerciseDefinitionId = firstCircuitExercises[0].exerciseDefinitionId!!,
         )
         assertThat(previousWorkoutSets.map { it.setIndex to it.repsActual }).containsExactly(
             0 to 8,
             1 to 8,
         ).inOrder()
 
-        val secondSessionId = sessionRepository.startWorkout(workoutId)
+        val secondWorkoutId = workoutRepository.saveWorkout(
+            WorkoutDraft(
+                name = "Regression workout alternate",
+                circuits = listOf(
+                    CircuitDraft(
+                        name = "Circuit 1",
+                        exercises = listOf(
+                            ExerciseDraft(name = " Exercise 1 ", setCount = 2),
+                            ExerciseDraft(name = "exercise 2", setCount = 2),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val secondSessionId = sessionRepository.startWorkout(secondWorkoutId)
         val secondWorkoutSnapshot = snapshotFor(secondSessionId)
         assertThat(secondWorkoutSnapshot.currentSetIndex).isEqualTo(0)
         assertThat(secondWorkoutSnapshot.exercises[0].suggestedReps).isEqualTo(8)
@@ -137,8 +151,8 @@ class SessionPrefillWorkflowTest {
     private suspend fun snapshotFor(sessionId: Long) =
         SessionProgressCalculator.buildSnapshot(
             detail = sessionRepository.getSessionDetail(sessionId)!!,
-            prefillProvider = { exerciseTemplateId, setIndex ->
-                exerciseTemplateId?.let { sessionRepository.getLatestCompletedSetEntry(it, setIndex) }
+            prefillProvider = { exerciseDefinitionId, setIndex ->
+                exerciseDefinitionId?.let { sessionRepository.getLatestCompletedSetEntry(it, setIndex) }
             },
         )
 }

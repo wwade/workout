@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
@@ -59,6 +60,7 @@ fun WorkoutListScreen(
     onStartWorkout: (Long) -> Unit,
     onResumeWorkout: (Long) -> Unit,
     onOpenHistory: () -> Unit,
+    onOpenExerciseLibrary: () -> Unit,
     onPrepareExport: suspend () -> WorkoutExportFile?,
     onExportSaved: (String) -> Unit,
     onExportFailed: (String) -> Unit,
@@ -137,6 +139,9 @@ fun WorkoutListScreen(
                     }
                     IconButton(onClick = onOpenHistory) {
                         Icon(Icons.Default.History, contentDescription = "History")
+                    }
+                    IconButton(onClick = onOpenExerciseLibrary) {
+                        Icon(Icons.Default.FitnessCenter, contentDescription = "Exercises")
                     }
                 },
             )

@@ -234,6 +234,7 @@ class ActiveSessionViewModelTest {
                         ExerciseSessionDetail(
                             exerciseSessionId = 1,
                             exerciseTemplateId = 101,
+                            exerciseDefinitionId = 201,
                             name = "Press",
                             guidance = "",
                             repMin = 6,
@@ -271,6 +272,7 @@ class ActiveSessionViewModelTest {
                         ExerciseSessionDetail(
                             exerciseSessionId = 1,
                             exerciseTemplateId = 101,
+                            exerciseDefinitionId = 201,
                             name = "Press",
                             guidance = "",
                             repMin = 6,
@@ -318,6 +320,7 @@ class ActiveSessionViewModelTest {
                         ExerciseSessionDetail(
                             exerciseSessionId = 1,
                             exerciseTemplateId = 101,
+                            exerciseDefinitionId = 201,
                             name = "Press",
                             guidance = "",
                             repMin = 6,
@@ -361,6 +364,7 @@ class ActiveSessionViewModelTest {
                         ExerciseSessionDetail(
                             exerciseSessionId = 2,
                             exerciseTemplateId = 102,
+                            exerciseDefinitionId = 202,
                             name = "Row",
                             guidance = "",
                             repMin = 8,
@@ -428,7 +432,7 @@ private class FakeSessionRepository(
 
     override fun observeCompletedSessions(): Flow<List<CompletedSessionListItem>> = flowOf(emptyList())
 
-    override suspend fun getLatestCompletedSetEntry(exerciseTemplateId: Long, setIndex: Int): SetEntry? {
+    override suspend fun getLatestCompletedSetEntry(exerciseDefinitionId: Long, setIndex: Int): SetEntry? {
         return SetEntry(
             id = 1,
             exerciseSessionId = 999,
@@ -440,7 +444,8 @@ private class FakeSessionRepository(
         )
     }
 
-    override suspend fun getPreviousWorkoutSetEntries(exerciseTemplateId: Long): List<ExerciseSetHistoryItem> {
+    override suspend fun getPreviousWorkoutSetEntries(exerciseDefinitionId: Long): List<ExerciseSetHistoryItem> {
+        check(exerciseDefinitionId == 201L || exerciseDefinitionId == 202L)
         return listOf(
             historyItem(workoutName = "Previous workout", setIndex = 0, reps = 8, load = 30.0),
             historyItem(workoutName = "Previous workout", setIndex = 1, reps = 7, load = 30.0),
@@ -448,9 +453,10 @@ private class FakeSessionRepository(
     }
 
     override suspend fun getRecentCompletedSetEntries(
-        exerciseTemplateId: Long,
+        exerciseDefinitionId: Long,
         limit: Int,
     ): List<ExerciseSetHistoryItem> {
+        check(exerciseDefinitionId == 201L || exerciseDefinitionId == 202L)
         return listOf(
             historyItem(workoutName = "Previous workout", setIndex = 0, reps = 8, load = 30.0),
             historyItem(workoutName = "Previous workout", setIndex = 1, reps = 7, load = 30.0),

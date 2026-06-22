@@ -7,6 +7,7 @@ import dev.wwade.workout.domain.model.CircuitDraft
 import dev.wwade.workout.domain.model.DefaultWorkoutDrafts
 import dev.wwade.workout.domain.model.ExerciseDraft
 import dev.wwade.workout.domain.model.WorkoutDraft
+import dev.wwade.workout.domain.repository.ExerciseDefinitionRepository
 import dev.wwade.workout.domain.repository.WorkoutRepository
 import dev.wwade.workout.domain.usecase.ValidateWorkoutDraftUseCase
 import dev.wwade.workout.ui.state.WorkoutEditorState
@@ -18,6 +19,7 @@ import kotlinx.coroutines.launch
 
 class WorkoutEditorViewModel(
     private val workoutRepository: WorkoutRepository,
+    private val exerciseDefinitionRepository: ExerciseDefinitionRepository,
     private val workoutId: Long?,
 ) : ViewModel() {
     private val validator = ValidateWorkoutDraftUseCase()
@@ -29,6 +31,11 @@ class WorkoutEditorViewModel(
     val state: StateFlow<WorkoutEditorState> = _state.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            exerciseDefinitionRepository.observeExerciseDefinitions().collect { definitions ->
+                _state.update { it.copy(exerciseDefinitions = definitions) }
+            }
+        }
         viewModelScope.launch {
             if (workoutId != null) {
                 workoutRepository.getWorkout(workoutId)?.let { workout ->
@@ -43,6 +50,7 @@ class WorkoutEditorViewModel(
                                     exercises = circuit.exercises.map { exercise ->
                                         ExerciseDraft(
                                             id = exercise.id,
+                                            exerciseDefinitionId = exercise.exerciseDefinitionId,
                                             name = exercise.name,
                                             guidance = exercise.guidance,
                                             repMin = exercise.repMin,

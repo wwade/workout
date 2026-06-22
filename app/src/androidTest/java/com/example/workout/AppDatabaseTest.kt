@@ -2,9 +2,13 @@ package dev.wwade.workout
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.testing.MigrationTestHelper
+import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.wwade.workout.data.db.AppDatabase
+import dev.wwade.workout.data.db.MIGRATION_2_3
 import dev.wwade.workout.domain.model.CircuitDraft
 import dev.wwade.workout.domain.model.ExerciseDraft
 import dev.wwade.workout.domain.model.SessionStatus
@@ -13,11 +17,18 @@ import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class AppDatabaseTest {
+    @get:Rule
+    val migrationHelper = MigrationTestHelper(
+        InstrumentationRegistry.getInstrumentation(),
+        AppDatabase::class.java,
+    )
+
     private lateinit var database: AppDatabase
 
     @Before
@@ -54,7 +65,9 @@ class AppDatabaseTest {
 
         assertThat(workout?.circuits).hasSize(1)
         assertThat(workout?.circuits?.single()?.exercises).hasSize(2)
-        assertThat(workout?.circuits?.single()?.exercises?.first()?.restTimeSeconds).isEqualTo(45)
+        val firstExercise = workout?.circuits?.single()?.exercises?.first()
+        assertThat(firstExercise?.exercise?.restTimeSeconds).isEqualTo(45)
+        assertThat(firstExercise?.definition?.name).isEqualTo("First")
     }
 
     @Test
@@ -81,7 +94,9 @@ class AppDatabaseTest {
         assertThat(session?.circuits).hasSize(1)
         assertThat(session?.circuits?.single()?.circuit?.setCount).isEqualTo(2)
         assertThat(session?.circuits?.single()?.exercises).hasSize(2)
-        assertThat(session?.circuits?.single()?.exercises?.first()?.exercise?.restTimeSecondsSnapshot).isEqualTo(75)
+        val firstSessionExercise = session?.circuits?.single()?.exercises?.first()?.exercise
+        assertThat(firstSessionExercise?.restTimeSecondsSnapshot).isEqualTo(75)
+        assertThat(firstSessionExercise?.exerciseDefinitionId).isNotNull()
     }
 
     @Test
@@ -133,5 +148,74 @@ class AppDatabaseTest {
             SessionStatus.IN_PROGRESS,
             SessionStatus.COMPLETED,
         ).inOrder()
+    }
+
+    @Test
+    fun migration2To3BackfillsExerciseDefinitions() {
+        val dbName = "migration-2-3"
+        migrationHelper.createDatabase(dbName, 2).apply {
+            seedVersion2WorkoutAndSession()
+            close()
+        }
+
+        val migrated = migrationHelper.runMigrationsAndValidate(dbName, 3, true, MIGRATION_2_3)
+
+        migrated.query("SELECT name, normalizedName FROM exercise_definitions ORDER BY id").use { cursor ->
+            assertThat(cursor.count).isEqualTo(1)
+            cursor.moveToFirst()
+            assertThat(cursor.getString(0)).isEqualTo("Press")
+            assertThat(cursor.getString(1)).isEqualTo("press")
+        }
+        migrated.query("SELECT COUNT(DISTINCT exerciseDefinitionId) FROM exercise_templates").use { cursor ->
+            cursor.moveToFirst()
+            assertThat(cursor.getInt(0)).isEqualTo(1)
+        }
+        migrated.query("SELECT exerciseDefinitionId, exerciseNameSnapshot FROM exercise_sessions").use { cursor ->
+            cursor.moveToFirst()
+            assertThat(cursor.isNull(0)).isFalse()
+            assertThat(cursor.getString(1)).isEqualTo("Press")
+        }
+        migrated.close()
+    }
+
+    private fun SupportSQLiteDatabase.seedVersion2WorkoutAndSession() {
+        execSQL("INSERT INTO workout_templates(id, name, sortOrder, createdAt, updatedAt) VALUES (1, 'A', 0, 1, 1)")
+        execSQL("INSERT INTO workout_templates(id, name, sortOrder, createdAt, updatedAt) VALUES (2, 'B', 1, 1, 1)")
+        execSQL("INSERT INTO circuit_templates(id, workoutId, name, sortOrder) VALUES (10, 1, 'Main', 0)")
+        execSQL("INSERT INTO circuit_templates(id, workoutId, name, sortOrder) VALUES (20, 2, 'Main', 0)")
+        execSQL(
+            """
+            INSERT INTO exercise_templates(
+                id, circuitId, name, guidance, repMin, repMax, loadKind, loadMin, loadMax,
+                loadUnit, restTimeSeconds, setCount, sortOrder
+            ) VALUES (100, 10, 'Press', 'First guidance', 6, 8, 'WEIGHT', 10.0, 20.0, 'LB', 60, 2, 0)
+            """.trimIndent(),
+        )
+        execSQL(
+            """
+            INSERT INTO exercise_templates(
+                id, circuitId, name, guidance, repMin, repMax, loadKind, loadMin, loadMax,
+                loadUnit, restTimeSeconds, setCount, sortOrder
+            ) VALUES (200, 20, ' press ', 'Second guidance', 6, 8, 'WEIGHT', 10.0, 20.0, 'LB', 60, 2, 0)
+            """.trimIndent(),
+        )
+        execSQL(
+            "INSERT INTO workout_sessions(id, workoutTemplateId, workoutNameSnapshot, startedAt, completedAt, status) VALUES (1000, 1, 'A', 1, 2, 'COMPLETED')",
+        )
+        execSQL(
+            "INSERT INTO circuit_sessions(id, workoutSessionId, circuitTemplateId, circuitNameSnapshot, sortOrder, setCount) VALUES (1001, 1000, 10, 'Main', 0, 2)",
+        )
+        execSQL(
+            """
+            INSERT INTO exercise_sessions(
+                id, circuitSessionId, exerciseTemplateId, exerciseNameSnapshot, guidanceSnapshot,
+                repMinSnapshot, repMaxSnapshot, loadKindSnapshot, loadMinSnapshot, loadMaxSnapshot,
+                loadUnitSnapshot, restTimeSecondsSnapshot, sortOrder
+            ) VALUES (1002, 1001, 100, 'Press', 'First guidance', 6, 8, 'WEIGHT', 10.0, 20.0, 'LB', 60, 0)
+            """.trimIndent(),
+        )
+        execSQL(
+            "INSERT INTO set_entries(id, exerciseSessionId, setIndex, repsActual, loadActual, notes, skipped) VALUES (1003, 1002, 0, 8, 15.0, 'ok', 0)",
+        )
     }
 }

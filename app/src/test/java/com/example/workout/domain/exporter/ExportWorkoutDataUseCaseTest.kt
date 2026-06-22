@@ -2,6 +2,7 @@ package dev.wwade.workout.domain.exporter
 
 import dev.wwade.workout.domain.model.CircuitSessionDetail
 import dev.wwade.workout.domain.model.CircuitTemplate
+import dev.wwade.workout.domain.model.ExerciseDefinition
 import dev.wwade.workout.domain.model.ExerciseSessionDetail
 import dev.wwade.workout.domain.model.ExerciseTemplate
 import dev.wwade.workout.domain.model.LoadKind
@@ -25,6 +26,17 @@ class ExportWorkoutDataUseCaseTest {
             exportRepository = object : WorkoutDataExportRepository {
                 override suspend fun exportSnapshot(): WorkoutDataExportSnapshot {
                     return WorkoutDataExportSnapshot(
+                        exerciseDefinitions = listOf(
+                            ExerciseDefinition(
+                                id = 30,
+                                name = "Press",
+                                normalizedName = "press",
+                                defaultGuidance = "Control the eccentric",
+                                archived = false,
+                                createdAt = 10,
+                                updatedAt = 20,
+                            ),
+                        ),
                         workouts = listOf(
                             WorkoutTemplate(
                                 id = 1,
@@ -42,8 +54,10 @@ class ExportWorkoutDataUseCaseTest {
                                             ExerciseTemplate(
                                                 id = 3,
                                                 circuitId = 2,
+                                                exerciseDefinitionId = 30,
                                                 name = "Press",
                                                 guidance = "Control the eccentric",
+                                                guidanceOverride = "Control the eccentric",
                                                 repMin = 6,
                                                 repMax = 8,
                                                 loadKind = LoadKind.WEIGHT,
@@ -78,6 +92,7 @@ class ExportWorkoutDataUseCaseTest {
                                             ExerciseSessionDetail(
                                                 exerciseSessionId = 13,
                                                 exerciseTemplateId = 3,
+                                                exerciseDefinitionId = 30,
                                                 name = "Press",
                                                 guidance = "Control the eccentric",
                                                 repMin = 6,
@@ -114,7 +129,8 @@ class ExportWorkoutDataUseCaseTest {
         val result = useCase()
 
         assertThat(result.exportedAt).isEqualTo(1_782_000_000_000)
-        assertThat(result.json).contains("\"schemaVersion\": 1")
+        assertThat(result.json).contains("\"schemaVersion\": 2")
+        assertThat(result.json).contains("\"exerciseDefinitionId\": 30")
         assertThat(result.json).contains("\"name\": \"Push Day\"")
         assertThat(result.json).contains("\"status\": \"IN_PROGRESS\"")
         assertThat(result.json).contains("\"notes\": \"Felt good\"")

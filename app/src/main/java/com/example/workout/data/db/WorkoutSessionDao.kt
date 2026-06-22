@@ -57,7 +57,7 @@ abstract class WorkoutSessionDao {
         INNER JOIN exercise_sessions es ON es.id = se.exerciseSessionId
         INNER JOIN circuit_sessions cs ON cs.id = es.circuitSessionId
         INNER JOIN workout_sessions ws ON ws.id = cs.workoutSessionId
-        WHERE es.exerciseTemplateId = :exerciseTemplateId
+        WHERE es.exerciseDefinitionId = :exerciseDefinitionId
             AND se.setIndex = :setIndex
             AND ws.status = 'COMPLETED'
         ORDER BY ws.completedAt DESC
@@ -65,7 +65,7 @@ abstract class WorkoutSessionDao {
         """,
     )
     abstract suspend fun getLatestCompletedSetEntry(
-        exerciseTemplateId: Long,
+        exerciseDefinitionId: Long,
         setIndex: Int,
     ): SetEntryEntity?
 
@@ -84,13 +84,13 @@ abstract class WorkoutSessionDao {
         INNER JOIN exercise_sessions es ON es.id = se.exerciseSessionId
         INNER JOIN circuit_sessions cs ON cs.id = es.circuitSessionId
         INNER JOIN workout_sessions ws ON ws.id = cs.workoutSessionId
-        WHERE es.exerciseTemplateId = :exerciseTemplateId
+        WHERE es.exerciseDefinitionId = :exerciseDefinitionId
             AND ws.status = 'COMPLETED'
             AND ws.id = (
                 SELECT ws2.id FROM workout_sessions ws2
                 INNER JOIN circuit_sessions cs2 ON cs2.workoutSessionId = ws2.id
                 INNER JOIN exercise_sessions es2 ON es2.circuitSessionId = cs2.id
-                WHERE es2.exerciseTemplateId = :exerciseTemplateId
+                WHERE es2.exerciseDefinitionId = :exerciseDefinitionId
                     AND ws2.status = 'COMPLETED'
                 ORDER BY ws2.completedAt DESC, ws2.id DESC
                 LIMIT 1
@@ -99,7 +99,7 @@ abstract class WorkoutSessionDao {
         """,
     )
     abstract suspend fun getPreviousWorkoutSetEntries(
-        exerciseTemplateId: Long,
+        exerciseDefinitionId: Long,
     ): List<ExerciseSetHistoryProjection>
 
     @Query(
@@ -117,14 +117,14 @@ abstract class WorkoutSessionDao {
         INNER JOIN exercise_sessions es ON es.id = se.exerciseSessionId
         INNER JOIN circuit_sessions cs ON cs.id = es.circuitSessionId
         INNER JOIN workout_sessions ws ON ws.id = cs.workoutSessionId
-        WHERE es.exerciseTemplateId = :exerciseTemplateId
+        WHERE es.exerciseDefinitionId = :exerciseDefinitionId
             AND ws.status = 'COMPLETED'
         ORDER BY ws.completedAt DESC, ws.id DESC, se.setIndex ASC
         LIMIT :limit
         """,
     )
     abstract suspend fun getRecentCompletedSetEntries(
-        exerciseTemplateId: Long,
+        exerciseDefinitionId: Long,
         limit: Int,
     ): List<ExerciseSetHistoryProjection>
 
@@ -141,31 +141,32 @@ abstract class WorkoutSessionDao {
         )
 
         template.circuits.sortedBy { it.circuit.sortOrder }.forEach { circuit ->
-            val sortedExercises = circuit.exercises.sortedBy { it.sortOrder }
+            val sortedExercises = circuit.exercises.sortedBy { it.exercise.sortOrder }
             val circuitSessionId = insertCircuitSession(
                 CircuitSessionEntity(
                     workoutSessionId = sessionId,
                     circuitTemplateId = circuit.circuit.id,
                     circuitNameSnapshot = circuit.circuit.name,
                     sortOrder = circuit.circuit.sortOrder,
-                    setCount = sortedExercises.firstOrNull()?.setCount ?: 0,
+                    setCount = sortedExercises.firstOrNull()?.exercise?.setCount ?: 0,
                 ),
             )
             sortedExercises.forEach { exercise ->
                 insertExerciseSession(
                     ExerciseSessionEntity(
                         circuitSessionId = circuitSessionId,
-                        exerciseTemplateId = exercise.id,
-                        exerciseNameSnapshot = exercise.name,
-                        guidanceSnapshot = exercise.guidance,
-                        repMinSnapshot = exercise.repMin,
-                        repMaxSnapshot = exercise.repMax,
-                        loadKindSnapshot = exercise.loadKind,
-                        loadMinSnapshot = exercise.loadMin,
-                        loadMaxSnapshot = exercise.loadMax,
-                        loadUnitSnapshot = exercise.loadUnit,
-                        restTimeSecondsSnapshot = exercise.restTimeSeconds,
-                        sortOrder = exercise.sortOrder,
+                        exerciseTemplateId = exercise.exercise.id,
+                        exerciseDefinitionId = exercise.definition.id,
+                        exerciseNameSnapshot = exercise.definition.name,
+                        guidanceSnapshot = exercise.exercise.guidance.ifBlank { exercise.definition.defaultGuidance },
+                        repMinSnapshot = exercise.exercise.repMin,
+                        repMaxSnapshot = exercise.exercise.repMax,
+                        loadKindSnapshot = exercise.exercise.loadKind,
+                        loadMinSnapshot = exercise.exercise.loadMin,
+                        loadMaxSnapshot = exercise.exercise.loadMax,
+                        loadUnitSnapshot = exercise.exercise.loadUnit,
+                        restTimeSecondsSnapshot = exercise.exercise.restTimeSeconds,
+                        sortOrder = exercise.exercise.sortOrder,
                     ),
                 )
             }

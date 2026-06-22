@@ -10,6 +10,20 @@ import dev.wwade.workout.domain.model.LoadKind
 import dev.wwade.workout.domain.model.LoadUnit
 import dev.wwade.workout.domain.model.SessionStatus
 
+@Entity(
+    tableName = "exercise_definitions",
+    indices = [Index(value = ["normalizedName"], unique = true)],
+)
+data class ExerciseDefinitionEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val normalizedName: String,
+    val defaultGuidance: String,
+    val archived: Boolean,
+    val createdAt: Long,
+    val updatedAt: Long,
+)
+
 @Entity(tableName = "workout_templates")
 data class WorkoutTemplateEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -47,13 +61,19 @@ data class CircuitTemplateEntity(
             childColumns = ["circuitId"],
             onDelete = ForeignKey.CASCADE,
         ),
+        ForeignKey(
+            entity = ExerciseDefinitionEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["exerciseDefinitionId"],
+            onDelete = ForeignKey.RESTRICT,
+        ),
     ],
-    indices = [Index("circuitId")],
+    indices = [Index("circuitId"), Index("exerciseDefinitionId")],
 )
 data class ExerciseTemplateEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val circuitId: Long,
-    val name: String,
+    val exerciseDefinitionId: Long,
     val guidance: String,
     val repMin: Int,
     val repMax: Int,
@@ -107,12 +127,13 @@ data class CircuitSessionEntity(
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("circuitSessionId"), Index("exerciseTemplateId")],
+    indices = [Index("circuitSessionId"), Index("exerciseTemplateId"), Index("exerciseDefinitionId")],
 )
 data class ExerciseSessionEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val circuitSessionId: Long,
     val exerciseTemplateId: Long?,
+    val exerciseDefinitionId: Long?,
     val exerciseNameSnapshot: String,
     val guidanceSnapshot: String,
     val repMinSnapshot: Int,
@@ -158,13 +179,28 @@ data class ExerciseSetHistoryProjection(
     val skipped: Boolean,
 )
 
+data class ExerciseDefinitionWithUsage(
+    @Embedded val definition: ExerciseDefinitionEntity,
+    val usageCount: Int,
+)
+
+data class ExerciseTemplateWithDefinition(
+    @Embedded val exercise: ExerciseTemplateEntity,
+    @Relation(
+        parentColumn = "exerciseDefinitionId",
+        entityColumn = "id",
+    )
+    val definition: ExerciseDefinitionEntity,
+)
+
 data class CircuitTemplateWithExercises(
     @Embedded val circuit: CircuitTemplateEntity,
     @Relation(
+        entity = ExerciseTemplateEntity::class,
         parentColumn = "id",
         entityColumn = "circuitId",
     )
-    val exercises: List<ExerciseTemplateEntity>,
+    val exercises: List<ExerciseTemplateWithDefinition>,
 )
 
 data class WorkoutTemplateWithChildren(

@@ -2,9 +2,9 @@ package dev.wwade.workout.data.repository
 
 import dev.wwade.workout.data.db.CircuitSessionWithExercises
 import dev.wwade.workout.data.db.CircuitTemplateWithExercises
+import dev.wwade.workout.data.db.ExerciseDefinitionWithUsage
 import dev.wwade.workout.data.db.ExerciseSetHistoryProjection
-import dev.wwade.workout.data.db.ExerciseSessionEntity
-import dev.wwade.workout.data.db.ExerciseTemplateEntity
+import dev.wwade.workout.data.db.ExerciseTemplateWithDefinition
 import dev.wwade.workout.data.db.SetEntryEntity
 import dev.wwade.workout.data.db.WorkoutSessionEntity
 import dev.wwade.workout.data.db.WorkoutSessionWithChildren
@@ -13,6 +13,7 @@ import dev.wwade.workout.data.db.WorkoutTemplateWithChildren
 import dev.wwade.workout.domain.model.CircuitSessionDetail
 import dev.wwade.workout.domain.model.CircuitTemplate
 import dev.wwade.workout.domain.model.CompletedSessionListItem
+import dev.wwade.workout.domain.model.ExerciseDefinition
 import dev.wwade.workout.domain.model.ExerciseSessionDetail
 import dev.wwade.workout.domain.model.ExerciseSetHistoryItem
 import dev.wwade.workout.domain.model.ExerciseTemplate
@@ -51,25 +52,27 @@ private fun CircuitTemplateWithExercises.toDomain(workoutId: Long): CircuitTempl
         workoutId = workoutId,
         name = circuit.name,
         sortOrder = circuit.sortOrder,
-        exercises = exercises.sortedBy { it.sortOrder }.map { it.toDomain(circuit.id) },
+        exercises = exercises.sortedBy { it.exercise.sortOrder }.map { it.toDomain(circuit.id) },
     )
 }
 
-private fun ExerciseTemplateEntity.toDomain(circuitId: Long): ExerciseTemplate {
+private fun ExerciseTemplateWithDefinition.toDomain(circuitId: Long): ExerciseTemplate {
     return ExerciseTemplate(
-        id = id,
+        id = exercise.id,
         circuitId = circuitId,
-        name = name,
-        guidance = guidance,
-        repMin = repMin,
-        repMax = repMax,
-        loadKind = loadKind,
-        loadMin = loadMin,
-        loadMax = loadMax,
-        loadUnit = loadUnit,
-        restTimeSeconds = restTimeSeconds,
-        setCount = setCount,
-        sortOrder = sortOrder,
+        exerciseDefinitionId = definition.id,
+        name = definition.name,
+        guidance = exercise.guidance.ifBlank { definition.defaultGuidance },
+        guidanceOverride = exercise.guidance,
+        repMin = exercise.repMin,
+        repMax = exercise.repMax,
+        loadKind = exercise.loadKind,
+        loadMin = exercise.loadMin,
+        loadMax = exercise.loadMax,
+        loadUnit = exercise.loadUnit,
+        restTimeSeconds = exercise.restTimeSeconds,
+        setCount = exercise.setCount,
+        sortOrder = exercise.sortOrder,
     )
 }
 
@@ -96,6 +99,7 @@ private fun CircuitSessionWithExercises.toDomain(): CircuitSessionDetail {
             ExerciseSessionDetail(
                 exerciseSessionId = exerciseWithSets.exercise.id,
                 exerciseTemplateId = exerciseWithSets.exercise.exerciseTemplateId,
+                exerciseDefinitionId = exerciseWithSets.exercise.exerciseDefinitionId,
                 name = exerciseWithSets.exercise.exerciseNameSnapshot,
                 guidance = exerciseWithSets.exercise.guidanceSnapshot,
                 repMin = exerciseWithSets.exercise.repMinSnapshot,
@@ -134,6 +138,19 @@ fun ExerciseSetHistoryProjection.toDomain(): ExerciseSetHistoryItem {
         loadActual = loadActual,
         notes = notes,
         skipped = skipped,
+    )
+}
+
+fun ExerciseDefinitionWithUsage.toDomain(): ExerciseDefinition {
+    return ExerciseDefinition(
+        id = definition.id,
+        name = definition.name,
+        normalizedName = definition.normalizedName,
+        defaultGuidance = definition.defaultGuidance,
+        archived = definition.archived,
+        createdAt = definition.createdAt,
+        updatedAt = definition.updatedAt,
+        usageCount = usageCount,
     )
 }
 

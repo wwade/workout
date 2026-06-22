@@ -83,28 +83,28 @@ class RoomSessionRepository(
     }
 
     override suspend fun getLatestCompletedSetEntry(
-        exerciseTemplateId: Long,
+        exerciseDefinitionId: Long,
         setIndex: Int,
     ): SetEntry? {
         return workoutSessionDao.getLatestCompletedSetEntry(
-            exerciseTemplateId = exerciseTemplateId,
+            exerciseDefinitionId = exerciseDefinitionId,
             setIndex = setIndex,
         )?.toDomain()
     }
 
     override suspend fun getPreviousWorkoutSetEntries(
-        exerciseTemplateId: Long,
+        exerciseDefinitionId: Long,
     ): List<ExerciseSetHistoryItem> {
-        return workoutSessionDao.getPreviousWorkoutSetEntries(exerciseTemplateId)
+        return workoutSessionDao.getPreviousWorkoutSetEntries(exerciseDefinitionId)
             .map { it.toDomain() }
     }
 
     override suspend fun getRecentCompletedSetEntries(
-        exerciseTemplateId: Long,
+        exerciseDefinitionId: Long,
         limit: Int,
     ): List<ExerciseSetHistoryItem> {
         return workoutSessionDao.getRecentCompletedSetEntries(
-            exerciseTemplateId = exerciseTemplateId,
+            exerciseDefinitionId = exerciseDefinitionId,
             limit = limit,
         ).map { it.toDomain() }
     }

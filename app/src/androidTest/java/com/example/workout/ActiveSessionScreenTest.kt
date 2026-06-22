@@ -342,6 +342,7 @@ class ActiveSessionScreenTest {
         return ActiveExerciseCardState(
             exerciseSessionId = exerciseSessionId,
             exerciseTemplateId = exerciseSessionId,
+            exerciseDefinitionId = exerciseSessionId + 100,
             exerciseName = exerciseName,
             guidance = "",
             repRangeLabel = "6-8",

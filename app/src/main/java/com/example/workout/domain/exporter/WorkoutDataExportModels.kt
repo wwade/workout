@@ -2,6 +2,7 @@ package dev.wwade.workout.domain.exporter
 
 import dev.wwade.workout.domain.model.CircuitSessionDetail
 import dev.wwade.workout.domain.model.CircuitTemplate
+import dev.wwade.workout.domain.model.ExerciseDefinition
 import dev.wwade.workout.domain.model.ExerciseSessionDetail
 import dev.wwade.workout.domain.model.ExerciseTemplate
 import dev.wwade.workout.domain.model.SetEntry
@@ -10,6 +11,7 @@ import dev.wwade.workout.domain.model.WorkoutTemplate
 import kotlinx.serialization.Serializable
 
 data class WorkoutDataExportSnapshot(
+    val exerciseDefinitions: List<ExerciseDefinition>,
     val workouts: List<WorkoutTemplate>,
     val sessions: List<WorkoutSessionDetail>,
 )
@@ -23,8 +25,19 @@ data class WorkoutDataExportArtifact(
 data class WorkoutDataExportDto(
     val schemaVersion: Int,
     val exportedAt: Long,
+    val exerciseDefinitions: List<ExerciseDefinitionExportDto>,
     val workouts: List<WorkoutTemplateExportDto>,
     val sessions: List<WorkoutSessionExportDto>,
+)
+
+@Serializable
+data class ExerciseDefinitionExportDto(
+    val id: Long,
+    val name: String,
+    val defaultGuidance: String,
+    val archived: Boolean,
+    val createdAt: Long,
+    val updatedAt: Long,
 )
 
 @Serializable
@@ -50,8 +63,10 @@ data class CircuitTemplateExportDto(
 data class ExerciseTemplateExportDto(
     val id: Long,
     val circuitId: Long,
+    val exerciseDefinitionId: Long,
     val name: String,
     val guidance: String,
+    val guidanceOverride: String,
     val repMin: Int,
     val repMax: Int,
     val loadKind: dev.wwade.workout.domain.model.LoadKind,
@@ -88,6 +103,7 @@ data class CircuitSessionExportDto(
 data class ExerciseSessionExportDto(
     val exerciseSessionId: Long,
     val exerciseTemplateId: Long?,
+    val exerciseDefinitionId: Long?,
     val name: String,
     val guidance: String,
     val repMin: Int,
@@ -114,10 +130,22 @@ data class SetEntryExportDto(
 
 fun WorkoutDataExportSnapshot.toDto(exportedAt: Long): WorkoutDataExportDto {
     return WorkoutDataExportDto(
-        schemaVersion = 1,
+        schemaVersion = 2,
         exportedAt = exportedAt,
+        exerciseDefinitions = exerciseDefinitions.map { it.toDto() },
         workouts = workouts.map { it.toDto() },
         sessions = sessions.map { it.toDto() },
+    )
+}
+
+private fun ExerciseDefinition.toDto(): ExerciseDefinitionExportDto {
+    return ExerciseDefinitionExportDto(
+        id = id,
+        name = name,
+        defaultGuidance = defaultGuidance,
+        archived = archived,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
     )
 }
 
@@ -146,8 +174,10 @@ private fun ExerciseTemplate.toDto(): ExerciseTemplateExportDto {
     return ExerciseTemplateExportDto(
         id = id,
         circuitId = circuitId,
+        exerciseDefinitionId = exerciseDefinitionId,
         name = name,
         guidance = guidance,
+        guidanceOverride = guidanceOverride,
         repMin = repMin,
         repMax = repMax,
         loadKind = loadKind,
@@ -187,6 +217,7 @@ private fun ExerciseSessionDetail.toDto(): ExerciseSessionExportDto {
     return ExerciseSessionExportDto(
         exerciseSessionId = exerciseSessionId,
         exerciseTemplateId = exerciseTemplateId,
+        exerciseDefinitionId = exerciseDefinitionId,
         name = name,
         guidance = guidance,
         repMin = repMin,

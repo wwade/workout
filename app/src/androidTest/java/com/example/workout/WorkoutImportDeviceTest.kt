@@ -73,6 +73,7 @@ class WorkoutImportDeviceTest {
                 exportRepository = object : WorkoutDataExportRepository {
                     override suspend fun exportSnapshot(): WorkoutDataExportSnapshot {
                         return WorkoutDataExportSnapshot(
+                            exerciseDefinitions = emptyList(),
                             workouts = emptyList(),
                             sessions = emptyList(),
                         )
@@ -92,6 +93,7 @@ class WorkoutImportDeviceTest {
                     onStartWorkout = {},
                     onResumeWorkout = {},
                     onOpenHistory = {},
+                    onOpenExerciseLibrary = {},
                     onPrepareExport = { null },
                     onExportSaved = {},
                     onExportFailed = {},
