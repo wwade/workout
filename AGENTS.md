@@ -27,7 +27,7 @@ $env:GRADLE_USER_HOME=(Join-Path $PWD '.gradle-user')
 - `.\gradlew.bat assembleDebug --warning-mode all`
 - `.\gradlew.bat assembleE2e --warning-mode all`
 - `.\gradlew.bat testDebugUnitTest --warning-mode all`
-- `.\gradlew.bat app:connectedDebugAndroidTest --warning-mode all`
+- `.\gradlew.bat simDebugAndroidTest --warning-mode all`
 - `.\gradlew.bat help --warning-mode all`
 
 To capture logs for inspection:
@@ -35,7 +35,7 @@ To capture logs for inspection:
 ```powershell
 .\gradlew.bat assembleDebug --warning-mode all *> gradle-assemble.log
 .\gradlew.bat testDebugUnitTest --warning-mode all *> gradle-test.log
-.\gradlew.bat app:connectedDebugAndroidTest --warning-mode all *> gradle-connected-test.log
+.\gradlew.bat simDebugAndroidTest --warning-mode all *> gradle-managed-device-test.log
 ```
 
 ## Import Feature Notes
@@ -54,4 +54,4 @@ To capture logs for inspection:
 - If the project-local Gradle cache has a Windows file lock, use a second project-local cache such as `.gradle-user-import` and keep it ignored.
 - Gradle can emit structured warnings into `build/reports/problems/problems-report.html` even when stdout is quiet.
 - Package ids by build type are `dev.wwade.workout` for release, `dev.wwade.workout.debug` for debug, and `dev.wwade.workout.e2e` for the dedicated e2e app install.
-- Instrumentation tests are exposed by the debug Android test task (`app:connectedDebugAndroidTest`). This Gradle project does not currently define an e2e-specific connected Android test task.
+- Instrumentation tests are exposed by the managed-device debug task (`simDebugAndroidTest`). This Gradle project does not currently define an e2e-specific managed-device test task.

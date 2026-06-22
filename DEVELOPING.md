@@ -31,26 +31,24 @@ From Android Studio:
 - Run app
 - Run unit tests
 - Run instrumentation tests
-- Use the debug Android test variant for device-backed instrumentation runs
+- Use the managed Pixel 9 Pro API 36 virtual device for instrumentation runs
 
 From a terminal, once Gradle is available:
 
 ```bash
 ./gradlew test
-./gradlew connectedAndroidTest
+./gradlew simDebugAndroidTest
 ./gradlew assembleDebug
 ./gradlew assembleE2e
-./gradlew app:connectedDebugAndroidTest
 ```
 
 On Windows with the wrapper present:
 
 ```powershell
 .\gradlew.bat test
-.\gradlew.bat connectedAndroidTest
+.\gradlew.bat simDebugAndroidTest
 .\gradlew.bat assembleDebug
 .\gradlew.bat assembleE2e
-.\gradlew.bat app:connectedDebugAndroidTest
 ```
 
 Build identities:
@@ -59,7 +57,7 @@ Build identities:
 - `debug`: `dev.wwade.workout.debug`
 - `e2e`: `dev.wwade.workout.e2e`
 
-Instrumentation tests currently live under the debug Android test variant and are run with `app:connectedDebugAndroidTest` or `connectedAndroidTest`. The `e2e` build variant assembles a dedicated app id, but this Gradle project does not currently expose an e2e-specific connected Android test task.
+Instrumentation tests now run against the managed Pixel 9 Pro API 36 virtual device by default. Use `simDebugAndroidTest` for the debug variant; the `e2e` build variant still assembles separately, but this project does not currently expose an e2e-specific managed-device test task.
 
 ## Architecture
 
@@ -143,7 +141,7 @@ Add tests alongside new behavior when possible:
 
 - The app currently uses a lightweight manual dependency container instead of a DI framework.
 - The editor uses dialogs and move buttons instead of drag-and-drop or a multi-screen editing flow.
-- Instrumentation and Compose device tests still require a connected emulator or physical device.
+- Instrumentation and Compose device tests now target the managed Pixel 9 Pro API 36 virtual device by default.
 
 ## Suggested Next Improvements
 

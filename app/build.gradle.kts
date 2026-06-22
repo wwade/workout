@@ -23,6 +23,18 @@ android {
         }
     }
 
+    testOptions {
+        managedDevices {
+            localDevices {
+                create("sim") {
+                    device = "Pixel 9 Pro"
+                    apiLevel = 36
+                    systemImageSource = "aosp"
+                }
+            }
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
