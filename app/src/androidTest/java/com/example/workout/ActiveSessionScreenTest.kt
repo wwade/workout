@@ -21,6 +21,7 @@ import dev.wwade.workout.ui.state.ActiveExerciseCardState
 import dev.wwade.workout.ui.state.ActiveExerciseHistoryDialogState
 import dev.wwade.workout.ui.state.ActiveExerciseHistoryRowState
 import dev.wwade.workout.ui.state.ActiveSessionState
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
@@ -182,6 +183,44 @@ class ActiveSessionScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("reps-1").assertTextContains("11")
         composeRule.onNodeWithTag("load-1").assertTextContains("35")
+    }
+
+    @Test
+    fun notesTypingIsBufferedWhenParentStateLags() {
+        var state by mutableStateOf(activeSessionState(currentSetIndex = 0))
+        var latestNotes = ""
+
+        composeRule.setContent {
+            ActiveSessionScreen(
+                state = state,
+                onBack = {},
+                onUpdateReps = { exerciseId, value ->
+                    state = state.updateExercise(exerciseId) { copy(repsInput = value) }
+                },
+                onUpdateLoad = { exerciseId, value ->
+                    state = state.updateExercise(exerciseId) { copy(loadInput = value) }
+                },
+                onUpdateNotes = { _, value ->
+                    latestNotes = value
+                },
+                onUpdateSkipped = { exerciseId, value ->
+                    state = state.updateExercise(exerciseId) { copy(skipped = value) }
+                },
+                onPreviousRound = {},
+                onNextRound = {},
+                onSelectRound = { _, _ -> },
+                onSaveRound = {},
+                onAbandonSession = {},
+                onShowExerciseHistory = {},
+                onDismissExerciseHistory = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("notes-1").performTextReplacement("testtest")
+        composeRule.onNodeWithTag("notes-1").assertTextContains("testtest")
+        composeRule.runOnIdle {
+            assertEquals("testtest", latestNotes)
+        }
     }
 
     @Test

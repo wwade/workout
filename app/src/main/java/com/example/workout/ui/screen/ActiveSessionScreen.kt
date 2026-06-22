@@ -273,7 +273,7 @@ fun ActiveSessionScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            SelectAllTextField(
+                            BufferedTextField(
                                 value = exercise.repsInput,
                                 onValueChange = { onUpdateReps(exercise.exerciseSessionId, it) },
                                 label = { Text("Reps") },
@@ -293,8 +293,10 @@ fun ActiveSessionScreen(
                                     },
                                 ),
                                 enabled = !exercise.skipped,
+                                selectAllOnFocus = true,
+                                singleLine = true,
                             )
-                            SelectAllTextField(
+                            BufferedTextField(
                                 value = exercise.loadInput,
                                 onValueChange = { onUpdateLoad(exercise.exerciseSessionId, it) },
                                 label = { Text("Load (${exercise.loadUnit.name.lowercase()})") },
@@ -323,14 +325,23 @@ fun ActiveSessionScreen(
                                     },
                                 ),
                                 enabled = !exercise.skipped,
+                                selectAllOnFocus = true,
+                                singleLine = true,
                             )
                         }
-                        OutlinedTextField(
+                        BufferedTextField(
                             value = exercise.notesInput,
                             onValueChange = { onUpdateNotes(exercise.exerciseSessionId, it) },
                             label = { Text("Notes") },
-                            modifier = Modifier.fillMaxWidth(),
+                            resetKey = "${state.currentCircuitIndex}:${state.currentSetIndex}:${exercise.exerciseSessionId}:notes",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("notes-${exercise.exerciseSessionId}"),
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
+                            keyboardActions = KeyboardActions.Default,
+                            enabled = !exercise.skipped,
+                            selectAllOnFocus = false,
+                            singleLine = false,
                         )
                     }
                 }
@@ -417,7 +428,7 @@ private fun HistoryRow(
 }
 
 @Composable
-private fun SelectAllTextField(
+private fun BufferedTextField(
     value: String,
     onValueChange: (String) -> Unit,
     label: @Composable () -> Unit,
@@ -426,12 +437,15 @@ private fun SelectAllTextField(
     keyboardOptions: KeyboardOptions,
     keyboardActions: KeyboardActions,
     enabled: Boolean,
+    selectAllOnFocus: Boolean,
+    singleLine: Boolean,
 ) {
     var fieldValue by remember(resetKey) { mutableStateOf(TextFieldValue(value)) }
     var wasFocused by remember(resetKey) { mutableStateOf(false) }
+    var isFocused by remember(resetKey) { mutableStateOf(false) }
 
-    LaunchedEffect(value, resetKey) {
-        if (value != fieldValue.text) {
+    LaunchedEffect(value, resetKey, isFocused) {
+        if (!isFocused && value != fieldValue.text) {
             fieldValue = TextFieldValue(value, TextRange(value.length))
         }
     }
@@ -444,14 +458,15 @@ private fun SelectAllTextField(
         },
         label = label,
         modifier = modifier.onFocusChanged { focusState ->
-            if (focusState.isFocused && !wasFocused && fieldValue.text.isNotEmpty()) {
+            isFocused = focusState.isFocused
+            if (selectAllOnFocus && focusState.isFocused && !wasFocused && fieldValue.text.isNotEmpty()) {
                 fieldValue = fieldValue.copy(selection = TextRange(0, fieldValue.text.length))
             }
             wasFocused = focusState.isFocused
         },
         keyboardOptions = keyboardOptions,
         keyboardActions = keyboardActions,
-        singleLine = true,
+        singleLine = singleLine,
         enabled = enabled,
     )
 }
