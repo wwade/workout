@@ -212,7 +212,6 @@ private fun WorkoutDataRestoreSnapshot.validate() {
     val exerciseDefinitionIds = exerciseDefinitions.map { it.id }.toSet()
     requireUniqueIds("exercise definitions", "exercise definition", exerciseDefinitions.map { it.id })
 
-    val workoutIds = workouts.map { it.id }.toSet()
     requireUniqueIds("workouts", "workout", workouts.map { it.id })
 
     val circuits = workouts.flatMap { workout ->
@@ -224,7 +223,6 @@ private fun WorkoutDataRestoreSnapshot.validate() {
             }
         }
     }
-    val circuitIds = circuits.map { it.id }.toSet()
     requireUniqueIds("circuits", "circuit", circuits.map { it.id })
 
     val exerciseTemplates = circuits.flatMap { circuit ->
@@ -241,39 +239,14 @@ private fun WorkoutDataRestoreSnapshot.validate() {
             }
         }
     }
-    val exerciseTemplateIds = exerciseTemplates.map { it.id }.toSet()
     requireUniqueIds("exercise templates", "exercise template", exerciseTemplates.map { it.id })
 
     requireUniqueIds("sessions", "session", sessions.map { it.sessionId })
-    sessions.forEach { session ->
-        session.workoutTemplateId?.let { workoutTemplateId ->
-            if (workoutTemplateId !in workoutIds) {
-                throw WorkoutImportException("Session ${session.sessionId} references missing workout $workoutTemplateId.")
-            }
-        }
-    }
-
     val circuitSessions = sessions.flatMap { it.circuits }
     requireUniqueIds("circuit sessions", "circuit session", circuitSessions.map { it.circuitSessionId })
-    circuitSessions.forEach { circuit ->
-        circuit.circuitTemplateId?.let { circuitTemplateId ->
-            if (circuitTemplateId !in circuitIds) {
-                throw WorkoutImportException(
-                    "Circuit session ${circuit.circuitSessionId} references missing circuit $circuitTemplateId.",
-                )
-            }
-        }
-    }
 
     val exerciseSessions = circuitSessions.flatMap { circuit ->
         circuit.exercises.onEach { exercise ->
-            exercise.exerciseTemplateId?.let { exerciseTemplateId ->
-                if (exerciseTemplateId !in exerciseTemplateIds) {
-                    throw WorkoutImportException(
-                        "Exercise session ${exercise.exerciseSessionId} references missing exercise template $exerciseTemplateId.",
-                    )
-                }
-            }
             exercise.exerciseDefinitionId?.let { exerciseDefinitionId ->
                 if (exerciseDefinitionId !in exerciseDefinitionIds) {
                     throw WorkoutImportException(

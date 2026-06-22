@@ -133,6 +133,23 @@ class WorkoutImportParserTest {
     }
 
     @Test
+    fun parsesFullBackupWithHistoricalSessionsForDeletedTemplates() {
+        val backupJson = validWorkoutDataBackupJson()
+            .replace("\"workoutTemplateId\": 1", "\"workoutTemplateId\": 99")
+            .replace("\"circuitTemplateId\": 2", "\"circuitTemplateId\": 98")
+            .replace("\"exerciseTemplateId\": 3", "\"exerciseTemplateId\": 97")
+
+        val parsedImport = parser.parseImport(backupJson)
+
+        assertThat(parsedImport).isInstanceOf(ParsedWorkoutImport.FullBackup::class.java)
+        val snapshot = (parsedImport as ParsedWorkoutImport.FullBackup).snapshot
+        assertThat(snapshot.sessions.single().workoutTemplateId).isEqualTo(99L)
+        assertThat(snapshot.sessions.single().circuits.single().circuitTemplateId).isEqualTo(98L)
+        assertThat(snapshot.sessions.single().circuits.single().exercises.single().exerciseTemplateId)
+            .isEqualTo(97L)
+    }
+
+    @Test
     fun rejectsMalformedJson() {
         val error = runCatching { parser.parse("{not json") }.exceptionOrNull()
 
