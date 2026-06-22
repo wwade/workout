@@ -82,6 +82,11 @@ class RoomSessionRepository(
         }
     }
 
+    override suspend fun deleteCompletedSessions(sessionIds: Set<Long>) {
+        if (sessionIds.isEmpty()) return
+        workoutSessionDao.deleteCompletedSessions(sessionIds)
+    }
+
     override suspend fun getLatestCompletedSetEntry(
         exerciseDefinitionId: Long,
         setIndex: Int,

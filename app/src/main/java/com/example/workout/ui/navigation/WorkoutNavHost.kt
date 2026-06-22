@@ -177,6 +177,12 @@ fun WorkoutNavHost(
                 state = state,
                 onBack = { navController.popBackStack() },
                 onOpenSession = { sessionId -> navController.navigate("summary/$sessionId") },
+                onSelectSession = viewModel::selectSession,
+                onToggleSessionSelection = viewModel::toggleSessionSelection,
+                onClearSelection = viewModel::clearSelection,
+                onRequestDeleteSelected = viewModel::requestDeleteSelected,
+                onCancelDelete = viewModel::cancelDelete,
+                onConfirmDelete = viewModel::confirmDelete,
             )
         }
 

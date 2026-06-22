@@ -428,11 +428,13 @@ private class FakeSessionRepository(
 
     override fun observeSessionDetail(sessionId: Long): Flow<WorkoutSessionDetail?> = detailFlow
 
-    override suspend fun getSessionDetail(sessionId: Long): WorkoutSessionDetail? = detailFlow.value
+    override suspend fun getSessionDetail(sessionId: Long): WorkoutSessionDetail = detailFlow.value
 
     override fun observeCompletedSessions(): Flow<List<CompletedSessionListItem>> = flowOf(emptyList())
 
-    override suspend fun getLatestCompletedSetEntry(exerciseDefinitionId: Long, setIndex: Int): SetEntry? {
+    override suspend fun deleteCompletedSessions(sessionIds: Set<Long>) = Unit
+
+    override suspend fun getLatestCompletedSetEntry(exerciseDefinitionId: Long, setIndex: Int): SetEntry {
         return SetEntry(
             id = 1,
             exerciseSessionId = 999,

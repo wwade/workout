@@ -271,18 +271,20 @@ private class FakeWorkoutListSessionRepository : SessionRepository {
 
     override fun observeSessionDetail(
         sessionId: Long,
-    ): Flow<dev.wwade.workout.domain.model.WorkoutSessionDetail?> = flowOf(null)
+    ): Flow<WorkoutSessionDetail?> = flowOf(null)
 
     override suspend fun getSessionDetail(
         sessionId: Long,
-    ): dev.wwade.workout.domain.model.WorkoutSessionDetail? = null
+    ): WorkoutSessionDetail? = null
 
     override fun observeCompletedSessions(): Flow<List<CompletedSessionListItem>> = flowOf(emptyList())
+
+    override suspend fun deleteCompletedSessions(sessionIds: Set<Long>) = Unit
 
     override suspend fun getLatestCompletedSetEntry(
         exerciseDefinitionId: Long,
         setIndex: Int,
-    ): dev.wwade.workout.domain.model.SetEntry? = null
+    ): SetEntry? = null
 
     override suspend fun getPreviousWorkoutSetEntries(
         exerciseDefinitionId: Long,

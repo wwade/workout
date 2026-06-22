@@ -26,4 +26,7 @@ data class WorkoutListMessage(
 
 data class HistoryState(
     val sessions: List<CompletedSessionListItem> = emptyList(),
+    val selectedSessionIds: Set<Long> = emptySet(),
+    val isSelectionMode: Boolean = false,
+    val pendingDeleteCount: Int = 0,
 )

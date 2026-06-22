@@ -2,7 +2,6 @@ package dev.wwade.workout.data.db
 
 import androidx.room.Dao
 import androidx.room.Insert
-import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
@@ -50,6 +49,9 @@ abstract class WorkoutSessionDao {
 
     @Query("SELECT * FROM workout_sessions WHERE status = 'COMPLETED' ORDER BY completedAt DESC")
     abstract fun observeCompletedSessions(): Flow<List<WorkoutSessionEntity>>
+
+    @Query("DELETE FROM workout_sessions WHERE status = 'COMPLETED' AND id IN (:sessionIds)")
+    abstract suspend fun deleteCompletedSessions(sessionIds: Set<Long>)
 
     @Query(
         """

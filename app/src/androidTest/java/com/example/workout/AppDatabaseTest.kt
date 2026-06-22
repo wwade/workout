@@ -5,10 +5,11 @@ import androidx.room.Room
 import androidx.room.testing.MigrationTestHelper
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.test.core.app.ApplicationProvider
-import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import dev.wwade.workout.data.db.AppDatabase
 import dev.wwade.workout.data.db.MIGRATION_2_3
+import dev.wwade.workout.data.db.SetEntryEntity
 import dev.wwade.workout.domain.model.CircuitDraft
 import dev.wwade.workout.domain.model.ExerciseDraft
 import dev.wwade.workout.domain.model.SessionStatus
@@ -151,6 +152,45 @@ class AppDatabaseTest {
     }
 
     @Test
+    fun deleteCompletedSessionsRemovesSessionGraph() = runBlocking {
+        val sessionId = createSession(status = SessionStatus.COMPLETED)
+        val exerciseSessionId = database.workoutSessionDao()
+            .getSessionDetail(sessionId)!!
+            .circuits.single()
+            .exercises.single()
+            .exercise.id
+        database.workoutSessionDao().upsertSetEntries(
+            listOf(
+                SetEntryEntity(
+                    exerciseSessionId = exerciseSessionId,
+                    setIndex = 0,
+                    repsActual = 8,
+                    loadActual = 20.0,
+                    notes = "Done",
+                    skipped = false,
+                ),
+            ),
+        )
+
+        database.workoutSessionDao().deleteCompletedSessions(setOf(sessionId))
+
+        assertThat(database.workoutSessionDao().getSessionDetail(sessionId)).isNull()
+        database.openHelper.readableDatabase.query("SELECT COUNT(*) FROM set_entries").use { cursor ->
+            cursor.moveToFirst()
+            assertThat(cursor.getInt(0)).isEqualTo(0)
+        }
+    }
+
+    @Test
+    fun deleteCompletedSessionsDoesNotDeleteActiveSession() = runBlocking {
+        val sessionId = createSession(status = SessionStatus.IN_PROGRESS)
+
+        database.workoutSessionDao().deleteCompletedSessions(setOf(sessionId))
+
+        assertThat(database.workoutSessionDao().getSessionDetail(sessionId)).isNotNull()
+    }
+
+    @Test
     fun migration2To3BackfillsExerciseDefinitions() {
         val dbName = "migration-2-3"
         migrationHelper.createDatabase(dbName, 2).apply {
@@ -217,5 +257,29 @@ class AppDatabaseTest {
         execSQL(
             "INSERT INTO set_entries(id, exerciseSessionId, setIndex, repsActual, loadActual, notes, skipped) VALUES (1003, 1002, 0, 8, 15.0, 'ok', 0)",
         )
+    }
+
+    private suspend fun createSession(status: SessionStatus): Long {
+        val workoutId = database.workoutTemplateDao().upsertWorkoutGraph(
+            WorkoutDraft(
+                name = "Delete test",
+                circuits = listOf(
+                    CircuitDraft(
+                        name = "Main",
+                        exercises = listOf(ExerciseDraft(name = "Press", setCount = 1)),
+                    ),
+                ),
+            ),
+        )
+        val template = database.workoutTemplateDao().getWorkoutTemplateGraph(workoutId)!!
+        val sessionId = database.workoutSessionDao().startWorkoutSession(template)
+        if (status != SessionStatus.IN_PROGRESS) {
+            database.workoutSessionDao().updateSessionStatus(
+                sessionId = sessionId,
+                status = status,
+                completedAt = 999L,
+            )
+        }
+        return sessionId
     }
 }

@@ -15,6 +15,7 @@ interface SessionRepository {
     fun observeSessionDetail(sessionId: Long): Flow<WorkoutSessionDetail?>
     suspend fun getSessionDetail(sessionId: Long): WorkoutSessionDetail?
     fun observeCompletedSessions(): Flow<List<CompletedSessionListItem>>
+    suspend fun deleteCompletedSessions(sessionIds: Set<Long>)
     suspend fun getLatestCompletedSetEntry(exerciseDefinitionId: Long, setIndex: Int): SetEntry?
     suspend fun getPreviousWorkoutSetEntries(exerciseDefinitionId: Long): List<ExerciseSetHistoryItem>
     suspend fun getRecentCompletedSetEntries(
