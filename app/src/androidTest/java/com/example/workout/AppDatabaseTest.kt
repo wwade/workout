@@ -21,6 +21,7 @@ import dev.wwade.workout.domain.model.ExerciseDraft
 import dev.wwade.workout.domain.model.SessionStatus
 import dev.wwade.workout.domain.model.WorkoutDraft
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
@@ -154,6 +155,42 @@ class AppDatabaseTest {
         assertThat(sessions.map { it.session.status }).containsExactly(
             SessionStatus.IN_PROGRESS,
             SessionStatus.COMPLETED,
+        ).inOrder()
+    }
+
+    @Test
+    fun observeWorkoutTemplatesSortsByRecentUseThenUnusedFallback() = runBlocking {
+        val olderUsedId = createWorkout("Older used")
+        val newerUsedId = createWorkout("Newer used")
+        val betaUnusedId = createWorkout("Beta")
+        val alphaUnusedId = createWorkout("alpha")
+        val spareOldId = createWorkout("Spare")
+        val spareNewId = createWorkout("spare")
+
+        updateWorkoutTimestamps(betaUnusedId, updatedAt = 300L)
+        updateWorkoutTimestamps(alphaUnusedId, updatedAt = 200L)
+        updateWorkoutTimestamps(spareOldId, updatedAt = 100L)
+        updateWorkoutTimestamps(spareNewId, updatedAt = 400L)
+
+        createSessionForWorkout(olderUsedId).also { sessionId ->
+            database.workoutSessionDao().updateSessionStatus(
+                sessionId = sessionId,
+                status = SessionStatus.COMPLETED,
+                completedAt = 1_000L,
+            )
+        }
+        val newerUsedSessionId = createSessionForWorkout(newerUsedId)
+        updateSessionStartedAt(newerUsedSessionId, startedAt = 2_000L)
+
+        val workouts = database.workoutTemplateDao().observeWorkoutTemplates().first()
+
+        assertThat(workouts.map { it.name }).containsExactly(
+            "Newer used",
+            "Older used",
+            "alpha",
+            "Beta",
+            "spare",
+            "Spare",
         ).inOrder()
     }
 
@@ -458,20 +495,42 @@ class AppDatabaseTest {
         )
     }
 
-    private suspend fun createSession(status: SessionStatus): Long {
-        val workoutId = database.workoutTemplateDao().upsertWorkoutGraph(
+    private suspend fun createWorkout(name: String): Long {
+        return database.workoutTemplateDao().upsertWorkoutGraph(
             WorkoutDraft(
-                name = "Delete test",
+                name = name,
                 circuits = listOf(
                     CircuitDraft(
                         name = "Main",
-                        exercises = listOf(ExerciseDraft(name = "Press", setCount = 1)),
+                        exercises = listOf(ExerciseDraft(name = "$name exercise", setCount = 1)),
                     ),
                 ),
             ),
         )
+    }
+
+    private fun updateWorkoutTimestamps(workoutId: Long, updatedAt: Long) {
+        database.openHelper.writableDatabase.execSQL(
+            "UPDATE workout_templates SET updatedAt = ? WHERE id = ?",
+            arrayOf(updatedAt, workoutId),
+        )
+    }
+
+    private suspend fun createSessionForWorkout(workoutId: Long): Long {
         val template = database.workoutTemplateDao().getWorkoutTemplateGraph(workoutId)!!
-        val sessionId = database.workoutSessionDao().startWorkoutSession(template)
+        return database.workoutSessionDao().startWorkoutSession(template)
+    }
+
+    private fun updateSessionStartedAt(sessionId: Long, startedAt: Long) {
+        database.openHelper.writableDatabase.execSQL(
+            "UPDATE workout_sessions SET startedAt = ? WHERE id = ?",
+            arrayOf(startedAt, sessionId),
+        )
+    }
+
+    private suspend fun createSession(status: SessionStatus): Long {
+        val workoutId = createWorkout("Delete test")
+        val sessionId = createSessionForWorkout(workoutId)
         if (status != SessionStatus.IN_PROGRESS) {
             database.workoutSessionDao().updateSessionStatus(
                 sessionId = sessionId,

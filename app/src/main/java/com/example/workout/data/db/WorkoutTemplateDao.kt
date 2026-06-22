@@ -14,7 +14,26 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 abstract class WorkoutTemplateDao {
-    @Query("SELECT * FROM workout_templates ORDER BY updatedAt DESC, sortOrder ASC")
+    @Query(
+        """
+        SELECT wt.* FROM workout_templates wt
+        LEFT JOIN (
+            SELECT
+                workoutTemplateId,
+                MAX(COALESCE(completedAt, startedAt)) AS lastUsedAt
+            FROM workout_sessions
+            WHERE workoutTemplateId IS NOT NULL
+            GROUP BY workoutTemplateId
+        ) usage ON usage.workoutTemplateId = wt.id
+        ORDER BY
+            CASE WHEN usage.lastUsedAt IS NULL THEN 1 ELSE 0 END ASC,
+            usage.lastUsedAt DESC,
+            CASE WHEN usage.lastUsedAt IS NULL THEN wt.name END COLLATE NOCASE ASC,
+            wt.updatedAt DESC,
+            wt.sortOrder ASC,
+            wt.id ASC
+        """,
+    )
     abstract fun observeWorkoutTemplates(): Flow<List<WorkoutTemplateEntity>>
 
     @Transaction

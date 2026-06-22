@@ -177,10 +177,10 @@ class MultiWorkoutPrefillUserFlowTest {
 
         composeRule.onNodeWithText("Finish").performClick()
         waitForCompletedSessionCount(expectedCompletedSessionCount)
-        composeRule.onNodeWithText(
-            "Set 1: reps $reps, load ${load}.0 lb",
+        waitForTextDisplayed(
+            text = "Set 1: reps $reps, load ${load}.0 lb",
             substring = true,
-        ).assertIsDisplayed()
+        )
         composeRule.onNodeWithText("Back").performClick()
         composeRule.onNodeWithText("Workout Tracker").assertIsDisplayed()
     }
@@ -193,10 +193,10 @@ class MultiWorkoutPrefillUserFlowTest {
         }
     }
 
-    private fun waitForTextDisplayed(text: String) {
+    private fun waitForTextDisplayed(text: String, substring: Boolean = false) {
         composeRule.waitUntil(timeoutMillis = 5_000) {
             runCatching {
-                composeRule.onNodeWithText(text).assertIsDisplayed()
+                composeRule.onNodeWithText(text, substring = substring).assertIsDisplayed()
             }.isSuccess
         }
     }
