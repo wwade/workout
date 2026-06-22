@@ -320,4 +320,4 @@ private fun List<ActiveExerciseCardState>.hasChangesComparedTo(
 
 private const val MaxHistoryRows = 24
 
-private val HistoryDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d")
+private val HistoryDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d, h:mm a")

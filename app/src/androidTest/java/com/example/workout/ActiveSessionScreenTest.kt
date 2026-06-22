@@ -256,7 +256,7 @@ class ActiveSessionScreenTest {
                             historyRow(setLabel = "Set 1", resultLabel = "8 reps - 30 lb"),
                             historyRow(
                                 workoutName = "Older workout",
-                                completedAtLabel = "Jun 1",
+                                completedAtLabel = "Jun 1, 7:30 AM",
                                 setLabel = "Set 1",
                                 resultLabel = "6 reps - 25 lb",
                             ),
@@ -357,7 +357,7 @@ class ActiveSessionScreenTest {
 
     private fun historyRow(
         workoutName: String = "Previous workout",
-        completedAtLabel: String = "Jun 14",
+        completedAtLabel: String = "Jun 14, 9:15 AM",
         setLabel: String,
         resultLabel: String,
     ): ActiveExerciseHistoryRowState {
