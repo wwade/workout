@@ -18,6 +18,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -80,6 +83,7 @@ class MultiWorkoutPrefillUserFlowTest {
     fun tearDown() {
         composeRule.runOnUiThread {
             composeRule.activity.setContent {}
+            composeRule.activity.viewModelStore.clear()
         }
         composeRule.waitForIdle()
         database.close()
@@ -260,7 +264,7 @@ class MultiWorkoutPrefillUserFlowTest {
 
         when (val currentRoute = route) {
             TestRoute.List -> {
-                val viewModel = remember {
+                val viewModel = testViewModel<WorkoutListViewModel>(key = "workout-list") {
                     WorkoutListViewModel(
                         workoutRepository = container.workoutRepository,
                         sessionRepository = container.sessionRepository,
@@ -303,7 +307,7 @@ class MultiWorkoutPrefillUserFlowTest {
             }
 
             is TestRoute.Session -> {
-                val viewModel = remember(currentRoute.sessionId) {
+                val viewModel = testViewModel<ActiveSessionViewModel>(key = "active-session-${currentRoute.sessionId}") {
                     ActiveSessionViewModel(
                         sessionRepository = container.sessionRepository,
                         sessionId = currentRoute.sessionId,
@@ -338,7 +342,7 @@ class MultiWorkoutPrefillUserFlowTest {
             }
 
             is TestRoute.Summary -> {
-                val viewModel = remember(currentRoute.sessionId) {
+                val viewModel = testViewModel<SessionSummaryViewModel>(key = "session-summary-${currentRoute.sessionId}") {
                     SessionSummaryViewModel(
                         sessionRepository = container.sessionRepository,
                         sessionId = currentRoute.sessionId,
@@ -351,6 +355,22 @@ class MultiWorkoutPrefillUserFlowTest {
                 )
             }
         }
+    }
+
+    @Composable
+    private inline fun <reified T : ViewModel> testViewModel(
+        key: String,
+        crossinline create: () -> T,
+    ): T {
+        return viewModel(
+            key = key,
+            factory = object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <VM : ViewModel> create(modelClass: Class<VM>): VM {
+                    return create() as VM
+                }
+            },
+        )
     }
 
     private sealed interface TestRoute {
