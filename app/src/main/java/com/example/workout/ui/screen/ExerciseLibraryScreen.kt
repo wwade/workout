@@ -1,5 +1,6 @@
 package dev.wwade.workout.ui.screen
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,11 +28,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import dev.wwade.workout.domain.model.ExerciseDefinition
 import dev.wwade.workout.domain.model.ExerciseDefinitionDraft
@@ -51,6 +55,9 @@ fun ExerciseLibraryScreen(
     val scope = rememberCoroutineScope()
     var editingExercise by remember { mutableStateOf<ExerciseDefinition?>(null) }
     var addingExercise by remember { mutableStateOf(false) }
+    val expandedExercises = remember { mutableStateMapOf<Long, Boolean>() }
+    val visibleExercises = state.filteredExercises
+    val allVisibleExpanded = visibleExercises.isNotEmpty() && visibleExercises.all { expandedExercises[it.id] == true }
 
     Scaffold(
         topBar = {
@@ -75,10 +82,28 @@ fun ExerciseLibraryScreen(
             OutlinedTextField(
                 value = state.searchQuery,
                 onValueChange = onUpdateSearch,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("exercise-search"),
                 label = { Text("Search exercises") },
                 singleLine = true,
             )
+            if (visibleExercises.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(
+                        onClick = {
+                            visibleExercises.forEach { exercise ->
+                                expandedExercises[exercise.id] = !allVisibleExpanded
+                            }
+                        },
+                    ) {
+                        Text(if (allVisibleExpanded) "Collapse all" else "Expand all")
+                    }
+                }
+            }
             state.saveError?.let { error ->
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
@@ -91,27 +116,35 @@ fun ExerciseLibraryScreen(
                 }
             }
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(state.filteredExercises, key = { it.id }) { exercise ->
+                items(visibleExercises, key = { it.id }) { exercise ->
+                    val expanded = expandedExercises[exercise.id] == true
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(16.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Top,
                         ) {
                             Column(
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        expandedExercises[exercise.id] = !expanded
+                                    },
                                 verticalArrangement = Arrangement.spacedBy(4.dp),
                             ) {
                                 Text(exercise.name, style = MaterialTheme.typography.titleMedium)
-                                if (exercise.defaultGuidance.isNotBlank()) {
-                                    Text(exercise.defaultGuidance)
+                                if (expanded) {
+                                    if (exercise.defaultGuidance.isNotBlank()) {
+                                        Text(exercise.defaultGuidance)
+                                    }
+                                    Text(
+                                        text = "${exercise.usageCount} workout uses${if (exercise.archived) " | archived" else ""}",
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
                                 }
-                                Text(
-                                    text = "${exercise.usageCount} workout uses${if (exercise.archived) " | archived" else ""}",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
                             }
                             Row {
                                 IconButton(onClick = { editingExercise = exercise }) {
