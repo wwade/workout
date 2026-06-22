@@ -10,6 +10,19 @@ plugins {
 android {
     namespace = "dev.wwade.workout"
     compileSdk = 36
+
+    val releaseStoreFile = System.getenv("WORKOUT_RELEASE_STORE_FILE")
+    val releaseStorePassword = System.getenv("WORKOUT_RELEASE_STORE_PASSWORD")
+    val releaseKeyAlias = System.getenv("WORKOUT_RELEASE_KEY_ALIAS")
+    val releaseKeyPassword = System.getenv("WORKOUT_RELEASE_KEY_PASSWORD")
+    val hasReleaseSigningConfig =
+        listOf(
+            releaseStoreFile,
+            releaseStorePassword,
+            releaseKeyAlias,
+            releaseKeyPassword,
+        ).all { !it.isNullOrBlank() }
+
     defaultConfig {
         applicationId = "dev.wwade.workout"
         minSdk = 26
@@ -20,6 +33,17 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
+        }
+    }
+
+    signingConfigs {
+        if (hasReleaseSigningConfig) {
+            create("release") {
+                storeFile = file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
         }
     }
 
@@ -36,6 +60,9 @@ android {
 
         release {
             isMinifyEnabled = false
+            if (hasReleaseSigningConfig) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",

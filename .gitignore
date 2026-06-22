@@ -7,6 +7,7 @@
 .idea/
 build/
 */build/
+/app/release/
 local.properties
 captures/
 *.iml
