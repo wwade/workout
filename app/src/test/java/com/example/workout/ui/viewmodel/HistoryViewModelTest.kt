@@ -145,6 +145,7 @@ private fun historyItem(sessionId: Long): CompletedSessionListItem {
     return CompletedSessionListItem(
         sessionId = sessionId,
         workoutName = "Workout $sessionId",
+        startedAt = sessionId,
         completedAt = sessionId,
         circuitCount = 1,
     )

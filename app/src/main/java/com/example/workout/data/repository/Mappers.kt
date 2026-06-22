@@ -158,6 +158,7 @@ fun WorkoutSessionEntity.toCompletedListItem(circuitCount: Int): CompletedSessio
     return CompletedSessionListItem(
         sessionId = id,
         workoutName = workoutNameSnapshot,
+        startedAt = startedAt,
         completedAt = completedAt ?: startedAt,
         circuitCount = circuitCount,
     )

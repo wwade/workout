@@ -181,6 +181,7 @@ data class SetEntryDraft(
 data class CompletedSessionListItem(
     val sessionId: Long,
     val workoutName: String,
+    val startedAt: Long,
     val completedAt: Long,
     val circuitCount: Int,
 )

@@ -35,6 +35,7 @@ import dev.wwade.workout.ui.state.SessionSummaryState
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlin.math.roundToLong
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -100,6 +101,7 @@ fun HistoryScreen(
                 HistorySessionRow(
                     sessionId = session.sessionId,
                     workoutName = session.workoutName,
+                    startedAt = session.startedAt,
                     completedAt = session.completedAt,
                     circuitCount = session.circuitCount,
                     selected = session.sessionId in state.selectedSessionIds,
@@ -146,6 +148,7 @@ fun HistoryScreen(
 private fun HistorySessionRow(
     sessionId: Long,
     workoutName: String,
+    startedAt: Long,
     completedAt: Long,
     circuitCount: Int,
     selected: Boolean,
@@ -168,7 +171,8 @@ private fun HistorySessionRow(
             },
             supportingContent = {
                 Column {
-                    Text("Completed ${formatDateTime(completedAt)}")
+                    Text("Started ${formatDateTime(startedAt)}")
+                    Text(formatDurationMinutes(startedAt = startedAt, completedAt = completedAt))
                     Text("$circuitCount circuits")
                 }
             },
@@ -245,4 +249,10 @@ private fun formatDateTime(value: Long): String {
     return DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a")
         .withZone(ZoneId.systemDefault())
         .format(Instant.ofEpochMilli(value))
+}
+
+private fun formatDurationMinutes(startedAt: Long, completedAt: Long): String {
+    val durationMillis = (completedAt - startedAt).coerceAtLeast(0L)
+    val minutes = (durationMillis / 60_000.0).roundToLong()
+    return if (minutes == 1L) "1 minute" else "$minutes minutes"
 }
