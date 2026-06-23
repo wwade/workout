@@ -7,21 +7,21 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+val releaseStoreFile = System.getenv("WORKOUT_RELEASE_STORE_FILE")
+val releaseStorePassword = System.getenv("WORKOUT_RELEASE_STORE_PASSWORD")
+val releaseKeyAlias = System.getenv("WORKOUT_RELEASE_KEY_ALIAS")
+val releaseKeyPassword = System.getenv("WORKOUT_RELEASE_KEY_PASSWORD")
+val hasReleaseSigningConfig =
+    listOf(
+        releaseStoreFile,
+        releaseStorePassword,
+        releaseKeyAlias,
+        releaseKeyPassword,
+    ).all { !it.isNullOrBlank() }
+
 android {
     namespace = "dev.wwade.workout"
     compileSdk = 36
-
-    val releaseStoreFile = System.getenv("WORKOUT_RELEASE_STORE_FILE")
-    val releaseStorePassword = System.getenv("WORKOUT_RELEASE_STORE_PASSWORD")
-    val releaseKeyAlias = System.getenv("WORKOUT_RELEASE_KEY_ALIAS")
-    val releaseKeyPassword = System.getenv("WORKOUT_RELEASE_KEY_PASSWORD")
-    val hasReleaseSigningConfig =
-        listOf(
-            releaseStoreFile,
-            releaseStorePassword,
-            releaseKeyAlias,
-            releaseKeyPassword,
-        ).all { !it.isNullOrBlank() }
 
     defaultConfig {
         applicationId = "dev.wwade.workout"
@@ -75,12 +75,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlin {
-        compilerOptions {
-            jvmTarget = JvmTarget.JVM_17
-        }
-    }
-
     buildFeatures {
         buildConfig = true
         compose = true
@@ -88,7 +82,8 @@ android {
 
     sourceSets {
         getByName("androidTest") {
-            assets.setSrcDirs(listOf("$projectDir/schemas"))
+            assets.directories.clear()
+            assets.directories.add("schemas")
         }
     }
 
@@ -96,6 +91,12 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_17
     }
 }
 
