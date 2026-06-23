@@ -122,6 +122,12 @@ Full data export is implemented as a separate domain-level exporter plus a worko
 
 - Drive backups reuse the full JSON export/import schema; there is no separate backup payload format.
 - Drive storage is scoped to `https://www.googleapis.com/auth/drive.appdata`, so snapshots live in the app-specific hidden Drive data folder.
+- Drive authorization requires Google Cloud setup outside this repository. Enable the Google Drive API in the Cloud project, then create Android OAuth clients for each installed app id you need to test:
+  - `dev.wwade.workout` for release
+  - `dev.wwade.workout.debug` for debug
+  - `dev.wwade.workout.e2e` for e2e
+- Each Android OAuth client must use the SHA-1 certificate fingerprint for the keystore that signed that variant. For local debug/e2e builds, run `./gradlew signingReport` or `.\gradlew.bat signingReport` and copy the matching variant's SHA-1. For release, use the release signing certificate SHA-1.
+- `UNREGISTERED_ON_API_CONSOLE` during Drive permission means the installed package name and signing SHA-1 do not match an Android OAuth client in the Cloud project, or the Drive API is not enabled.
 - Automatic backup is enabled only after explicit user authorization from the workout list screen.
 - `RoomSessionRepository.saveRoundEntries` returns whether the save newly completed the session. `ActiveSessionViewModel` uses that transition to launch a non-blocking Drive backup.
 - `BackupNowAfterWorkoutCompletionUseCase` uploads a new snapshot, then prunes older snapshots so only the newest five remain.

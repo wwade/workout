@@ -16,6 +16,7 @@ import dev.wwade.workout.domain.repository.WorkoutRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -75,6 +76,34 @@ class DriveBackupUseCasesTest {
     }
 
     @Test
+    fun backupAfterCompletionDoesNotRecordFailureWhenCancelled() = runTest {
+        val driveRepository = FakeDriveBackupRepository(
+            uploadError = CancellationException("Job was cancelled"),
+        )
+        val settingsRepository = FakeDriveBackupSettingsRepository(
+            DriveBackupSettings(
+                enabled = true,
+                lastFailureMessage = "previous failure",
+            ),
+        )
+        val useCase = BackupNowAfterWorkoutCompletionUseCase(
+            exportWorkoutDataUseCase = emptyExportUseCase(),
+            driveBackupRepository = driveRepository,
+            settingsRepository = settingsRepository,
+            accessTokenProvider = object : DriveBackupAccessTokenProvider {
+                override suspend fun getAccessTokenOrNull(): String = "token"
+            },
+        )
+
+        try {
+            useCase()
+        } catch (_: CancellationException) {
+        }
+
+        assertThat(settingsRepository.settings.value.lastFailureMessage).isEqualTo("previous failure")
+    }
+
+    @Test
     fun restoreDownloadsSnapshotAndImportsFullBackup() = runTest {
         val importRepository = FakeWorkoutDataImportRepository()
         val driveRepository = FakeDriveBackupRepository(downloadPayload = validWorkoutDataBackupJson())
@@ -112,6 +141,7 @@ class DriveBackupUseCasesTest {
 private class FakeDriveBackupRepository(
     snapshots: List<DriveBackupSnapshot> = emptyList(),
     private val downloadPayload: String = "{}",
+    private val uploadError: Throwable? = null,
 ) : DriveBackupRepository {
     private val snapshots = snapshots.toMutableList()
     val uploadedFileNames = mutableListOf<String>()
@@ -124,6 +154,7 @@ private class FakeDriveBackupRepository(
         exportedAt: Long,
         json: String,
     ): DriveBackupSnapshot {
+        uploadError?.let { throw it }
         uploadedFileNames += fileName
         val snapshot = DriveBackupSnapshot(
             id = "uploaded",

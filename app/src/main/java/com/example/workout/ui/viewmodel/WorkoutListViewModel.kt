@@ -216,7 +216,7 @@ class WorkoutListViewModel(
         importState.update {
             it.copy(
                 message = WorkoutListMessage(
-                    text = message,
+                    text = message.driveAuthorizationFailureMessage(),
                     isError = true,
                 ),
             )
@@ -501,6 +501,16 @@ class WorkoutListViewModel(
         return when (this) {
             is WorkoutImportException -> message ?: "Unable to import workouts."
             else -> message ?: "Unable to import workouts."
+        }
+    }
+
+    private fun String.driveAuthorizationFailureMessage(): String {
+        return if (contains("UNREGISTERED_ON_API_CONSOLE")) {
+            "Google Drive backup is not registered for this app build. " +
+                "Create or update the Google Cloud Android OAuth client for this package name and signing SHA-1, " +
+                "then confirm the Google Drive API is enabled."
+        } else {
+            this
         }
     }
 }

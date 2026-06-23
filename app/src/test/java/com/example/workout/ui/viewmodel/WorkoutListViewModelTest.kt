@@ -254,6 +254,22 @@ class WorkoutListViewModelTest {
     }
 
     @Test
+    fun driveAuthorizationUnregisteredApiConsoleShowsSetupHint() = runTest {
+        val viewModel = viewModel(FakeWorkoutRepository())
+        val collector = backgroundScope.launch {
+            viewModel.state.collectLatest { }
+        }
+
+        viewModel.onDriveAuthorizationFailed("8: [8] Unknown error [status=UNREGISTERED_ON_API_CONSOLE]")
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.message?.text).contains("not registered for this app build")
+        assertThat(viewModel.state.value.message?.text).contains("package name and signing SHA-1")
+        assertThat(viewModel.state.value.message?.isError).isTrue()
+        collector.cancel()
+    }
+
+    @Test
     fun listDriveBackupsShowsSnapshots() = runTest {
         val driveRepository = FakeDriveBackupRepository(
             snapshots = listOf(

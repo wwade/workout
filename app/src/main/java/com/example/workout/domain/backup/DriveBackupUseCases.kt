@@ -5,6 +5,7 @@ import dev.wwade.workout.domain.importer.ImportWorkoutsUseCase
 import dev.wwade.workout.domain.importer.WorkoutImportRequest
 import dev.wwade.workout.domain.importer.WorkoutImportResult
 import dev.wwade.workout.domain.importer.WorkoutImportSource
+import kotlinx.coroutines.CancellationException
 
 class SetDriveBackupEnabledUseCase(
     private val settingsRepository: DriveBackupSettingsRepository,
@@ -40,6 +41,7 @@ class BackupNowAfterWorkoutCompletionUseCase(
             pruneOldSnapshots(accessToken)
             settingsRepository.recordBackupSuccess(snapshot)
         }.onFailure { error ->
+            if (error is CancellationException) throw error
             settingsRepository.recordBackupFailure(error.message ?: "Unable to back up workout data to Drive.")
         }
     }
