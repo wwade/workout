@@ -21,12 +21,12 @@ val hasReleaseSigningConfig =
 
 android {
     namespace = "dev.wwade.workout"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "dev.wwade.workout"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 37
         versionCode = 4
         versionName = "1.3.0"
 
