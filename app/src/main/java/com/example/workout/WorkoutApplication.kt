@@ -113,10 +113,14 @@ private class DefaultAppContainer(
             driveBackupRepository = driveBackupRepository,
             settingsRepository = driveBackupSettingsRepository,
             accessTokenProvider = GoogleDriveBackupAccessTokenProvider(application),
+            variantKey = BuildConfig.BUILD_TYPE,
         )
 
     override val listDriveBackupSnapshotsUseCase: ListDriveBackupSnapshotsUseCase =
-        ListDriveBackupSnapshotsUseCase(driveBackupRepository)
+        ListDriveBackupSnapshotsUseCase(
+            driveBackupRepository = driveBackupRepository,
+            variantKey = BuildConfig.BUILD_TYPE,
+        )
 
     override val restoreDriveBackupUseCase: RestoreDriveBackupUseCase =
         RestoreDriveBackupUseCase(

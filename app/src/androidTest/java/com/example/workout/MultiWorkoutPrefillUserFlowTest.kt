@@ -430,10 +430,14 @@ class MultiWorkoutPrefillUserFlowTest {
                 accessTokenProvider = object : DriveBackupAccessTokenProvider {
                     override suspend fun getAccessTokenOrNull(): String? = null
                 },
+                variantKey = "debug",
             )
 
         override val listDriveBackupSnapshotsUseCase: ListDriveBackupSnapshotsUseCase =
-            ListDriveBackupSnapshotsUseCase(driveBackupRepository)
+            ListDriveBackupSnapshotsUseCase(
+                driveBackupRepository = driveBackupRepository,
+                variantKey = "debug",
+            )
 
         override val restoreDriveBackupUseCase: RestoreDriveBackupUseCase =
             RestoreDriveBackupUseCase(

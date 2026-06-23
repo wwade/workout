@@ -3,6 +3,7 @@ package dev.wwade.workout.data.repository
 import dev.wwade.workout.domain.backup.DRIVE_BACKUP_FILE_PREFIX
 import dev.wwade.workout.domain.backup.DriveBackupRepository
 import dev.wwade.workout.domain.backup.DriveBackupSnapshot
+import dev.wwade.workout.domain.backup.driveBackupExportedAtFromFileName
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
@@ -142,17 +143,10 @@ class DriveAppDataBackupRepository(
         return DriveBackupSnapshot(
             id = id,
             fileName = name,
-            exportedAt = appProperties?.get("exportedAt")?.toLongOrNull() ?: name.exportedAtFromFileName(),
+            exportedAt = appProperties?.get("exportedAt")?.toLongOrNull() ?: driveBackupExportedAtFromFileName(name),
             modifiedTime = modifiedTime?.let { Instant.parse(it).toEpochMilli() } ?: 0L,
             sizeBytes = size?.toLongOrNull(),
         )
-    }
-
-    private fun String.exportedAtFromFileName(): Long {
-        return removePrefix(DRIVE_BACKUP_FILE_PREFIX)
-            .removeSuffix(".json")
-            .toLongOrNull()
-            ?: 0L
     }
 
     private fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8.name())

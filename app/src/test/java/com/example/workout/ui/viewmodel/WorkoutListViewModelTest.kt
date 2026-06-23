@@ -505,7 +505,10 @@ class WorkoutListViewModelTest {
             ),
             driveBackupSettingsRepository = driveBackupSettingsRepository,
             setDriveBackupEnabledUseCase = SetDriveBackupEnabledUseCase(driveBackupSettingsRepository),
-            listDriveBackupSnapshotsUseCase = ListDriveBackupSnapshotsUseCase(driveBackupRepository),
+            listDriveBackupSnapshotsUseCase = ListDriveBackupSnapshotsUseCase(
+                driveBackupRepository = driveBackupRepository,
+                variantKey = "release",
+            ),
             restoreDriveBackupUseCase = RestoreDriveBackupUseCase(
                 driveBackupRepository = driveBackupRepository,
                 importWorkoutsUseCase = ImportWorkoutsUseCase(

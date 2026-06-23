@@ -122,6 +122,8 @@ Full data export is implemented as a separate domain-level exporter plus a worko
 
 - Drive backups reuse the full JSON export/import schema; there is no separate backup payload format.
 - Drive storage is scoped to `https://www.googleapis.com/auth/drive.appdata`, so snapshots live in the app-specific hidden Drive data folder.
+- Debug, e2e, and release builds can share the same hidden Drive app folder when their OAuth clients belong to the same Google Cloud project. The app partitions backups by build-variant filenames such as `workout-tracker-backup-debug-<timestamp>.json`, `workout-tracker-backup-e2e-<timestamp>.json`, and `workout-tracker-backup-release-<timestamp>.json`.
+- Each variant lists and prunes only its own snapshots, keeping the newest five. Legacy unscoped backups named `workout-tracker-backup-<timestamp>.json` are treated as release backups.
 - Drive authorization requires Google Cloud setup outside this repository. Enable the Google Drive API in the Cloud project, then create Android OAuth clients for each installed app id you need to test:
   - `dev.wwade.workout` for release
   - `dev.wwade.workout.debug` for debug

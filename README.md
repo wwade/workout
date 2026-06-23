@@ -107,7 +107,9 @@ The current export schema is JSON-only, uses top-level `schemaVersion: 2`, and i
 
 ## Google Drive Backup
 
-Use the Drive backup action on the workout list screen to grant app-specific Google Drive permission. When enabled, the app saves a JSON backup to the hidden Drive `appDataFolder` each time a workout is completed. The app keeps the newest five Drive snapshots and deletes older snapshots after a successful upload.
+Use the Drive backup action on the workout list screen to grant app-specific Google Drive permission. When enabled, the app saves a JSON backup to the hidden Drive `appDataFolder` each time a workout is completed. Debug, e2e, and release builds can share that same hidden Drive app folder when their OAuth clients belong to the same Google Cloud project, so backup files include the build variant in the filename. Each variant keeps its newest five Drive snapshots and deletes only older snapshots for that same variant after a successful upload.
+
+Legacy Drive backups named without an explicit variant are treated as release backups.
 
 The same Drive backup action can restore one of the available snapshots. Drive restore uses the full-backup restore path, so it replaces the current workout data with the selected snapshot.
 

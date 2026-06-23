@@ -20,6 +20,7 @@ class BackupNowAfterWorkoutCompletionUseCase(
     private val driveBackupRepository: DriveBackupRepository,
     private val settingsRepository: DriveBackupSettingsRepository,
     private val accessTokenProvider: DriveBackupAccessTokenProvider,
+    private val variantKey: String,
 ) {
     suspend operator fun invoke() {
         if (!settingsRepository.getSettings().enabled) return
@@ -34,7 +35,7 @@ class BackupNowAfterWorkoutCompletionUseCase(
             val artifact = exportWorkoutDataUseCase()
             val snapshot = driveBackupRepository.uploadSnapshot(
                 accessToken = accessToken,
-                fileName = driveBackupFileName(artifact.exportedAt),
+                fileName = driveBackupFileName(variantKey, artifact.exportedAt),
                 exportedAt = artifact.exportedAt,
                 json = artifact.json,
             )
@@ -48,6 +49,7 @@ class BackupNowAfterWorkoutCompletionUseCase(
 
     private suspend fun pruneOldSnapshots(accessToken: String) {
         driveBackupRepository.listSnapshots(accessToken)
+            .filter { it.isVisibleForVariant(variantKey) }
             .sortedWith(compareByDescending<DriveBackupSnapshot> { it.exportedAt }.thenByDescending { it.modifiedTime })
             .drop(DRIVE_BACKUP_LIMIT)
             .forEach { snapshot ->
@@ -58,9 +60,11 @@ class BackupNowAfterWorkoutCompletionUseCase(
 
 class ListDriveBackupSnapshotsUseCase(
     private val driveBackupRepository: DriveBackupRepository,
+    private val variantKey: String,
 ) {
     suspend operator fun invoke(accessToken: String): List<DriveBackupSnapshot> {
         return driveBackupRepository.listSnapshots(accessToken)
+            .filter { it.isVisibleForVariant(variantKey) }
             .sortedWith(compareByDescending<DriveBackupSnapshot> { it.exportedAt }.thenByDescending { it.modifiedTime })
     }
 }
@@ -75,6 +79,36 @@ class RestoreDriveBackupUseCase(
     }
 }
 
-fun driveBackupFileName(exportedAt: Long): String {
-    return "$DRIVE_BACKUP_FILE_PREFIX$exportedAt.json"
+fun driveBackupFileName(variantKey: String, exportedAt: Long): String {
+    return "$DRIVE_BACKUP_FILE_PREFIX${variantKey.normalizedDriveBackupVariantKey()}-$exportedAt.json"
 }
+
+fun driveBackupExportedAtFromFileName(fileName: String): Long {
+    if (!fileName.startsWith(DRIVE_BACKUP_FILE_PREFIX) || !fileName.endsWith(".json")) return 0L
+    return fileName.removePrefix(DRIVE_BACKUP_FILE_PREFIX)
+        .removeSuffix(".json")
+        .substringAfterLast("-")
+        .toLongOrNull()
+        ?: 0L
+}
+
+fun DriveBackupSnapshot.isVisibleForVariant(variantKey: String): Boolean {
+    val normalizedVariantKey = variantKey.normalizedDriveBackupVariantKey()
+    return driveBackupVariantKeyFromFileName(fileName)?.let { it == normalizedVariantKey }
+        ?: (normalizedVariantKey == RELEASE_DRIVE_BACKUP_VARIANT_KEY)
+}
+
+private fun driveBackupVariantKeyFromFileName(fileName: String): String? {
+    if (!fileName.startsWith(DRIVE_BACKUP_FILE_PREFIX) || !fileName.endsWith(".json")) return null
+    val nameBody = fileName.removePrefix(DRIVE_BACKUP_FILE_PREFIX).removeSuffix(".json")
+    if (nameBody.toLongOrNull() != null) return null
+    return nameBody.substringBeforeLast("-", missingDelimiterValue = "")
+        .takeIf { it.isNotBlank() }
+        ?.normalizedDriveBackupVariantKey()
+}
+
+private fun String.normalizedDriveBackupVariantKey(): String {
+    return lowercase()
+}
+
+private const val RELEASE_DRIVE_BACKUP_VARIANT_KEY = "release"

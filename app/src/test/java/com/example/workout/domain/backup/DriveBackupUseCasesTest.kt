@@ -24,12 +24,32 @@ import org.junit.Test
 
 class DriveBackupUseCasesTest {
     @Test
+    fun driveBackupFileNameIncludesVariantKey() {
+        assertThat(driveBackupFileName("release", 1_782_000_000_000))
+            .isEqualTo("workout-tracker-backup-release-1782000000000.json")
+        assertThat(driveBackupFileName("debug", 1_782_000_000_000))
+            .isEqualTo("workout-tracker-backup-debug-1782000000000.json")
+        assertThat(driveBackupFileName("e2e", 1_782_000_000_000))
+            .isEqualTo("workout-tracker-backup-e2e-1782000000000.json")
+    }
+
+    @Test
+    fun driveBackupExportedAtFromFileNameSupportsLegacyAndVariantNames() {
+        assertThat(driveBackupExportedAtFromFileName("workout-tracker-backup-1782000000000.json"))
+            .isEqualTo(1_782_000_000_000)
+        assertThat(driveBackupExportedAtFromFileName("workout-tracker-backup-debug-1782000000000.json"))
+            .isEqualTo(1_782_000_000_000)
+        assertThat(driveBackupExportedAtFromFileName("not-a-drive-backup-1782000000000.json"))
+            .isEqualTo(0L)
+    }
+
+    @Test
     fun backupAfterCompletionUploadsAndKeepsNewestFiveSnapshots() = runTest {
         val driveRepository = FakeDriveBackupRepository(
             snapshots = (1L..6L).map { index ->
                 DriveBackupSnapshot(
                     id = "old-$index",
-                    fileName = driveBackupFileName(index),
+                    fileName = driveBackupFileName("debug", index),
                     exportedAt = index,
                     modifiedTime = index,
                     sizeBytes = 10,
@@ -44,15 +64,91 @@ class DriveBackupUseCasesTest {
             accessTokenProvider = object : DriveBackupAccessTokenProvider {
                 override suspend fun getAccessTokenOrNull(): String = "token"
             },
+            variantKey = "debug",
         )
 
         useCase()
 
-        assertThat(driveRepository.uploadedFileNames).containsExactly(driveBackupFileName(1_782_000_000_000))
+        assertThat(driveRepository.uploadedFileNames).containsExactly(driveBackupFileName("debug", 1_782_000_000_000))
         assertThat(driveRepository.deletedSnapshotIds).containsExactly("old-1", "old-2")
         assertThat(settingsRepository.settings.value.lastFailureMessage).isNull()
         assertThat(settingsRepository.settings.value.lastSuccessFileName)
-            .isEqualTo(driveBackupFileName(1_782_000_000_000))
+            .isEqualTo(driveBackupFileName("debug", 1_782_000_000_000))
+    }
+
+    @Test
+    fun debugBackupPrunesOnlyDebugSnapshots() = runTest {
+        val driveRepository = FakeDriveBackupRepository(
+            snapshots = listOf(
+                DriveBackupSnapshot("debug-1", driveBackupFileName("debug", 1), 1, 1, 10),
+                DriveBackupSnapshot("debug-2", driveBackupFileName("debug", 2), 2, 2, 10),
+                DriveBackupSnapshot("debug-3", driveBackupFileName("debug", 3), 3, 3, 10),
+                DriveBackupSnapshot("debug-4", driveBackupFileName("debug", 4), 4, 4, 10),
+                DriveBackupSnapshot("debug-5", driveBackupFileName("debug", 5), 5, 5, 10),
+                DriveBackupSnapshot("release", driveBackupFileName("release", 1), 1, 1, 10),
+                DriveBackupSnapshot("legacy", "workout-tracker-backup-1.json", 1, 1, 10),
+                DriveBackupSnapshot("e2e", driveBackupFileName("e2e", 1), 1, 1, 10),
+            ),
+        )
+        val useCase = BackupNowAfterWorkoutCompletionUseCase(
+            exportWorkoutDataUseCase = emptyExportUseCase(),
+            driveBackupRepository = driveRepository,
+            settingsRepository = FakeDriveBackupSettingsRepository(DriveBackupSettings(enabled = true)),
+            accessTokenProvider = object : DriveBackupAccessTokenProvider {
+                override suspend fun getAccessTokenOrNull(): String = "token"
+            },
+            variantKey = "debug",
+        )
+
+        useCase()
+
+        assertThat(driveRepository.deletedSnapshotIds).containsExactly("debug-1")
+    }
+
+    @Test
+    fun releaseBackupPrunesReleaseAndLegacySnapshotsTogether() = runTest {
+        val driveRepository = FakeDriveBackupRepository(
+            snapshots = listOf(
+                DriveBackupSnapshot("release-1", driveBackupFileName("release", 1), 1, 1, 10),
+                DriveBackupSnapshot("release-2", driveBackupFileName("release", 2), 2, 2, 10),
+                DriveBackupSnapshot("release-3", driveBackupFileName("release", 3), 3, 3, 10),
+                DriveBackupSnapshot("legacy-4", "workout-tracker-backup-4.json", 4, 4, 10),
+                DriveBackupSnapshot("legacy-5", "workout-tracker-backup-5.json", 5, 5, 10),
+                DriveBackupSnapshot("legacy-6", "workout-tracker-backup-6.json", 6, 6, 10),
+                DriveBackupSnapshot("debug", driveBackupFileName("debug", 1), 1, 1, 10),
+            ),
+        )
+        val useCase = BackupNowAfterWorkoutCompletionUseCase(
+            exportWorkoutDataUseCase = emptyExportUseCase(),
+            driveBackupRepository = driveRepository,
+            settingsRepository = FakeDriveBackupSettingsRepository(DriveBackupSettings(enabled = true)),
+            accessTokenProvider = object : DriveBackupAccessTokenProvider {
+                override suspend fun getAccessTokenOrNull(): String = "token"
+            },
+            variantKey = "release",
+        )
+
+        useCase()
+
+        assertThat(driveRepository.deletedSnapshotIds).containsExactly("release-1", "release-2")
+    }
+
+    @Test
+    fun listSnapshotsShowsOnlyCurrentVariantWithLegacyReleaseOnly() = runTest {
+        val driveRepository = FakeDriveBackupRepository(
+            snapshots = listOf(
+                DriveBackupSnapshot("debug", driveBackupFileName("debug", 2), 2, 2, 10),
+                DriveBackupSnapshot("release", driveBackupFileName("release", 3), 3, 3, 10),
+                DriveBackupSnapshot("legacy", "workout-tracker-backup-4.json", 4, 4, 10),
+                DriveBackupSnapshot("e2e", driveBackupFileName("e2e", 5), 5, 5, 10),
+            ),
+        )
+
+        val debugSnapshots = ListDriveBackupSnapshotsUseCase(driveRepository, "debug")("token")
+        val releaseSnapshots = ListDriveBackupSnapshotsUseCase(driveRepository, "release")("token")
+
+        assertThat(debugSnapshots.map { it.id }).containsExactly("debug")
+        assertThat(releaseSnapshots.map { it.id }).containsExactly("legacy", "release").inOrder()
     }
 
     @Test
@@ -66,6 +162,7 @@ class DriveBackupUseCasesTest {
             accessTokenProvider = object : DriveBackupAccessTokenProvider {
                 override suspend fun getAccessTokenOrNull(): String? = null
             },
+            variantKey = "debug",
         )
 
         useCase()
@@ -93,6 +190,7 @@ class DriveBackupUseCasesTest {
             accessTokenProvider = object : DriveBackupAccessTokenProvider {
                 override suspend fun getAccessTokenOrNull(): String = "token"
             },
+            variantKey = "debug",
         )
 
         try {
