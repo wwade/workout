@@ -1,0 +1,53 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "dependencyDashboard": true,
+  "enabledManagers": [
+    "gradle",
+    "gradle-wrapper",
+    "github-actions"
+  ],
+  "labels": [
+    "dependencies"
+  ],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "before 5am on monday"
+    ]
+  },
+  "packageRules": [
+    {
+      "groupName": "Android Gradle tooling",
+      "matchManagers": [
+        "gradle"
+      ],
+      "matchPackageNames": [
+        "/^com\\.android(\\.|:)/",
+        "/^com\\.google\\.devtools\\.ksp$/",
+        "/^org\\.jetbrains\\.kotlin/"
+      ]
+    },
+    {
+      "groupName": "AndroidX",
+      "matchManagers": [
+        "gradle"
+      ],
+      "matchPackageNames": [
+        "/^androidx\\./"
+      ]
+    },
+    {
+      "groupName": "GitHub Actions",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ]
+    }
+  ]
+}
