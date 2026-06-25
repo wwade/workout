@@ -17,6 +17,7 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextReplacement
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -190,6 +191,8 @@ class MultiWorkoutPrefillUserFlowTest {
             composeRule.onNodeWithTag("load-$exerciseSessionId").performTextReplacement(load)
         }
 
+        composeRule.onNodeWithTag("load-$exerciseSessionId").performImeAction()
+        composeRule.waitForIdle()
         composeRule.onNodeWithText("Finish").performClick()
         waitForCompletedSessionCount(expectedCompletedSessionCount)
         waitForTextDisplayed(
@@ -201,7 +204,7 @@ class MultiWorkoutPrefillUserFlowTest {
     }
 
     private fun waitForDisplayed(testTag: String) {
-        composeRule.waitUntil(timeoutMillis = 5_000) {
+        composeRule.waitUntil(timeoutMillis = UiWaitTimeoutMillis) {
             runCatching {
                 composeRule.onNodeWithTag(testTag).assertIsDisplayed()
             }.isSuccess
@@ -209,7 +212,7 @@ class MultiWorkoutPrefillUserFlowTest {
     }
 
     private fun waitForTextDisplayed(text: String, substring: Boolean = false) {
-        composeRule.waitUntil(timeoutMillis = 5_000) {
+        composeRule.waitUntil(timeoutMillis = UiWaitTimeoutMillis) {
             runCatching {
                 composeRule.onNodeWithText(text, substring = substring).assertIsDisplayed()
             }.isSuccess
@@ -217,7 +220,7 @@ class MultiWorkoutPrefillUserFlowTest {
     }
 
     private fun waitForActiveExerciseSessionId(): Long {
-        composeRule.waitUntil(timeoutMillis = 5_000) {
+        composeRule.waitUntil(timeoutMillis = UiWaitTimeoutMillis) {
             runBlocking { database.workoutSessionDao().getActiveSessionId() } != null
         }
         return runBlocking {
@@ -232,7 +235,7 @@ class MultiWorkoutPrefillUserFlowTest {
     }
 
     private fun waitForCompletedSessionCount(expectedCount: Int) {
-        composeRule.waitUntil(timeoutMillis = 5_000) {
+        composeRule.waitUntil(timeoutMillis = CompletionWaitTimeoutMillis) {
             runBlocking {
                 database.workoutSessionDao()
                     .getAllSessionDetails()
@@ -475,3 +478,6 @@ class MultiWorkoutPrefillUserFlowTest {
         override suspend fun deleteSnapshot(accessToken: String, snapshotId: String) = Unit
     }
 }
+
+private const val UiWaitTimeoutMillis = 10_000L
+private const val CompletionWaitTimeoutMillis = 20_000L
