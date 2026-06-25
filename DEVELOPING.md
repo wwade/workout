@@ -163,6 +163,17 @@ Add tests alongside new behavior when possible:
 - use `src/test` for pure Kotlin and domain logic
 - use `src/androidTest` for Room, Compose, and device-backed behavior
 
+## Dependency and SDK Upgrades
+
+When upgrading Android Gradle Plugin, Kotlin, Android SDK, build tools, or test infrastructure:
+
+- Confirm the Android SDK platform and build-tools packages are available from `sdkmanager` before updating `compileSdk`, `targetSdk`, or CI install steps.
+- Keep `app/gradle.lockfile` and `settings-gradle.lockfile` in sync with dependency changes.
+- Keep Gradle dependency verification enabled. If a fresh cache reports missing checksums, run the relevant task with `--write-verification-metadata sha256`, then review `gradle/verification-metadata.xml` before committing.
+- Source and javadoc attachments used by Android Studio sync are trusted by filename pattern in verification metadata; build/runtime artifacts should still be pinned with checksums.
+- Verify platform-specific artifacts when CI runs on a different OS than local development. Android tools such as AAPT2 can resolve separate Windows and Linux artifacts, so a Windows build may not exercise every checksum needed by GitHub Actions.
+- Use a fresh Gradle user home when checking verification changes, for example `GRADLE_USER_HOME=.gradle-user-ci-debug ./gradlew assembleDebug --refresh-dependencies` on Unix-like shells or `$env:GRADLE_USER_HOME="$PWD\.gradle-user-ci-debug"; .\gradlew.bat assembleDebug --refresh-dependencies` in PowerShell.
+
 ## Known Gaps
 
 - The app currently uses a lightweight manual dependency container instead of a DI framework.
