@@ -16,7 +16,7 @@ turbine = "1.2.1"
 coroutines = "1.11.0"
 material = "1.14.0"
 serialization = "1.11.0"
-snakeyamlEngine = "2.7"
+snakeyamlEngine = "3.0.1"
 playServicesAuth = "21.6.0"
 
 [libraries]
